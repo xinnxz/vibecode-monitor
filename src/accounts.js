@@ -1,7 +1,7 @@
 /**
  * accounts.js — Account Data Management Module
  * 
- * Mengelola data akun Antigravity di localStorage.
+ * Mengelola data akun di localStorage.
  * Menyediakan CRUD operations dan event system untuk notify komponen lain.
  * 
  * Data Model per akun:

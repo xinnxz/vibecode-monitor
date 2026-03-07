@@ -29,4 +29,4 @@ const globe = initGlobe(container);
 initUI(globe.updateVisuals);
 
 // Log untuk debugging
-console.log('🌐 Antigravity Monitor initialized');
+console.log('🌐 Vibe Code Monitor initialized');
