@@ -2,12 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>antigravity-hack</title>
+    <title>Antigravity Monitor — Account Limit Tracker</title>
+    <meta name="description" content="Three.js globe dashboard to monitor Antigravity Google account limits and status in real-time." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>" />
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <!-- Three.js Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Header -->
+    <header id="header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10" />
+            <ellipse cx="12" cy="12" rx="10" ry="4" />
+            <ellipse cx="12" cy="12" rx="4" ry="10" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+          </svg>
+        </div>
+        <div>
+          <h1>Antigravity Monitor</h1>
+          <p class="subtitle">Account Limit Tracker</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="stats-bar" id="stats-bar">
+          <!-- Stats will be injected by JS -->
+        </div>
+      </div>
+    </header>
+
+    <!-- Side Panel -->
+    <aside id="side-panel" class="panel">
+      <div class="panel-header">
+        <h2>Accounts</h2>
+        <button id="btn-add-account" class="btn-primary" title="Add Account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add
+        </button>
+      </div>
+      <div class="panel-body" id="account-list">
+        <!-- Account cards will be injected by JS -->
+      </div>
+    </aside>
+
+    <!-- Modal -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h3 id="modal-title">Add Account</h3>
+          <button id="btn-modal-close" class="btn-icon" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <form id="account-form">
+          <div class="form-group">
+            <label for="input-name">Account Name</label>
+            <input type="text" id="input-name" placeholder="e.g. Gmail Pro #1" required />
+          </div>
+          <div class="form-group">
+            <label for="input-status">Status</label>
+            <select id="input-status" required>
+              <option value="available">✅ Available</option>
+              <option value="limited">🔴 Limited (Exhausted)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="input-time">Limit / Reset Time</label>
+            <input type="datetime-local" id="input-time" />
+            <span class="form-hint">When the limit resets or was exhausted</span>
+          </div>
+          <input type="hidden" id="input-id" />
+          <div class="form-actions">
+            <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div id="confirm-overlay" class="modal-overlay hidden">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3>Delete Account</h3>
+        </div>
+        <p id="confirm-message" class="confirm-text">Are you sure you want to delete this account?</p>
+        <div class="form-actions">
+          <button id="btn-confirm-cancel" class="btn-secondary">Cancel</button>
+          <button id="btn-confirm-delete" class="btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

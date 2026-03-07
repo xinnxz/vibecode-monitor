@@ -1,15 +1,17 @@
 {
-  "name": "antigravity-hack",
+  "name": "antigravity-monitor",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
     "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
   }
 }
