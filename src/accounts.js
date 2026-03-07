@@ -9,7 +9,8 @@
  *   id: string (UUID),
  *   name: string,
  *   status: "available" | "limited",
- *   limitTime: string (ISO datetime) | null,
+ *   refreshDays: number | null,     // sisa hari sampai refresh
+ *   refreshHours: number | null,    // sisa jam sampai refresh
  *   createdAt: string (ISO datetime)
  * }
  */
@@ -65,16 +66,17 @@ function saveAccounts(accounts) {
 
 /**
  * Tambah akun baru.
- * @param {Object} data - { name, status, limitTime }
+ * @param {Object} data - { name, status, refreshDays, refreshHours }
  * @returns {Object} Akun yang baru dibuat (dengan id dan createdAt)
  */
-export function addAccount({ name, status, limitTime }) {
+export function addAccount({ name, status, refreshDays, refreshHours }) {
   const accounts = getAccounts();
   const newAccount = {
     id: generateId(),
     name,
     status: status || 'available',
-    limitTime: limitTime || null,
+    refreshDays: refreshDays ?? null,
+    refreshHours: refreshHours ?? null,
     createdAt: new Date().toISOString(),
   };
   accounts.push(newAccount);

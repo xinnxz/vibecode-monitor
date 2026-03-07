@@ -816,24 +816,57 @@ html, body {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Time input group — cleaner layout */
+/* Time input group — duration layout */
 .form-time-group {
   position: relative;
 }
 
-.form-time-group input[type="datetime-local"] {
+.duration-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-field {
+  flex: 1;
+  position: relative;
+}
+
+.duration-field input[type="number"] {
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  padding-right: 40px;
+  /* Hide spinner arrows for cleaner look */
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
-.form-time-group input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7) sepia(1) saturate(3) hue-rotate(160deg);
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+.duration-field input[type="number"]::-webkit-outer-spin-button,
+.duration-field input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
-.form-time-group input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+.duration-label {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-cyan);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.duration-sep {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  color: var(--accent-cyan);
+  opacity: 0.3;
+  margin-top: -2px;
 }
 
 .form-hint {

@@ -27,7 +27,8 @@ let accountListEl,
   modalTitle,
   inputName,
   inputStatus,
-  inputTime,
+  inputDays,
+  inputHours,
   inputId;
 
 // Fungsi callback untuk update globe visuals
@@ -53,7 +54,8 @@ export function initUI(updateGlobeVisuals) {
   modalTitle = document.getElementById('modal-title');
   inputName = document.getElementById('input-name');
   inputStatus = document.getElementById('input-status');
-  inputTime = document.getElementById('input-time');
+  inputDays = document.getElementById('input-days');
+  inputHours = document.getElementById('input-hours');
   inputId = document.getElementById('input-id');
 
   // --- Event Listeners ---
@@ -203,12 +205,10 @@ function renderAccountList(accounts) {
             <span class="card-meta-key">status</span>
             <span class="card-meta-value status-text ${statusTextClass}">${isAvailable ? '● ACTIVE' : '✕ LIMITED'}</span>
           </div>
-          ${account.limitTime ? `
           <div class="card-meta-row">
-            <span class="card-meta-key">time</span>
-            <span class="card-meta-value">${formatDateTime(account.limitTime)}</span>
+            <span class="card-meta-key">reset</span>
+            <span class="card-meta-value">${formatDuration(account.refreshDays, account.refreshHours)}</span>
           </div>
-          ` : ''}
         </div>
       </div>
 
@@ -261,9 +261,8 @@ function openModal(editId = null) {
     modalTitle.textContent = '// edit_account';
     inputName.value = account.name;
     inputStatus.value = account.status;
-    inputTime.value = account.limitTime
-      ? account.limitTime.slice(0, 16) // Format "YYYY-MM-DDTHH:mm" untuk datetime-local
-      : '';
+    inputDays.value = account.refreshDays ?? '';
+    inputHours.value = account.refreshHours ?? '';
     inputId.value = account.id;
   } else {
     // Mode Add
@@ -295,17 +294,18 @@ function handleFormSubmit(e) {
 
   const name = inputName.value.trim();
   const status = inputStatus.value;
-  const limitTime = inputTime.value ? new Date(inputTime.value).toISOString() : null;
+  const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
+  const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
   const id = inputId.value;
 
   if (!name) return;
 
   if (id) {
     // Edit existing account
-    editAccount(id, { name, status, limitTime });
+    editAccount(id, { name, status, refreshDays, refreshHours });
   } else {
     // Add new account
-    addAccount({ name, status, limitTime });
+    addAccount({ name, status, refreshDays, refreshHours });
   }
 
   closeModal();
@@ -348,26 +348,23 @@ function handleConfirmDelete() {
 }
 
 /**
- * Format ISO datetime string ke format yang readable.
- * Contoh: "2026-03-08T12:00:00.000Z" → "08 Mar 2026, 19:00"
+ * Format durasi refresh ke string readable.
+ * Contoh: (6, 12) → "6d 12h"
+ *         (0, 4) → "4h"
+ *         (null, null) → "--"
  * 
- * @param {string} isoString
+ * @param {number|null} days
+ * @param {number|null} hours
  * @returns {string}
  */
-function formatDateTime(isoString) {
-  try {
-    const date = new Date(isoString);
-    return date.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return isoString;
-  }
+function formatDuration(days, hours) {
+  const d = days ?? 0;
+  const h = hours ?? 0;
+  if (d === 0 && h === 0 && days === null && hours === null) return '--';
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0 || parts.length === 0) parts.push(`${h}h`);
+  return parts.join(' ');
 }
 
 /**
