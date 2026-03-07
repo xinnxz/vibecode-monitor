@@ -165,20 +165,16 @@ function renderAccountList(accounts) {
   accountListEl.innerHTML = accounts
     .map(
       (account, index) => {
-        const isAvailable = account.status === 'available';
-        const statusLabel = isAvailable ? 'ONLINE' : 'BLOCKED';
-        const statusTextClass = isAvailable ? 'available' : 'limited';
-        const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
+        const dur = formatDuration(account.refreshDays, account.refreshHours);
 
         return `
-    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.08}s">
-      <!-- Terminal-style header bar -->
-      <div class="card-header-bar">
-        <div class="card-header-left">
-          <span class="card-status-indicator"></span>
-          <span>${statusLabel}</span>
-        </div>
-        <div class="card-header-actions">
+    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.04}s">
+      <div class="card-status-stripe"></div>
+      <div class="card-row">
+        <span class="card-dot"></span>
+        <span class="card-name">${escapeHtml(account.name)}</span>
+        ${dur !== '--' ? `<span class="card-duration">${dur}</span>` : ''}
+        <div class="card-actions">
           <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${account.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -193,27 +189,6 @@ function renderAccountList(accounts) {
           </button>
         </div>
       </div>
-
-      <!-- Card body with terminal-like meta info -->
-      <div class="card-body">
-        <div class="card-name">
-          <span class="card-name-prefix">&gt;</span>
-          ${escapeHtml(account.name)}
-        </div>
-        <div class="card-meta">
-          <div class="card-meta-row">
-            <span class="card-meta-key">status</span>
-            <span class="card-meta-value status-text ${statusTextClass}">${isAvailable ? '● ACTIVE' : '✕ LIMITED'}</span>
-          </div>
-          <div class="card-meta-row">
-            <span class="card-meta-key">reset</span>
-            <span class="card-meta-value">${formatDuration(account.refreshDays, account.refreshHours)}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer with hex ID -->
-      <div class="card-footer">0x${shortId}</div>
     </div>
   `;
       }
