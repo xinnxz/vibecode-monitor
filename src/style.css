@@ -149,44 +149,96 @@ html, body {
   pointer-events: auto;
 }
 
-/* Stats Bar */
+/* Stats Bar — Hacker Terminal Style */
 .stats-bar {
   display: flex;
-  gap: 16px;
+  gap: 8px;
 }
 
 .stat-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-glass);
-  font-size: 13px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+}
+
+/* Scanline overlay di setiap stat item */
+.stat-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.015) 2px,
+    rgba(255,255,255,0.015) 4px
+  );
+  pointer-events: none;
+}
+
+.stat-item.total {
+  border-color: rgba(56, 189, 248, 0.3);
+  color: var(--accent-cyan);
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+.stat-item.available {
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--accent-green);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+.stat-item.limited {
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--accent-red);
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
 }
 
 .stat-item .stat-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 16px;
 }
 
-.stat-item.total .stat-value { color: var(--accent-cyan); }
-.stat-item.available .stat-value { color: var(--accent-green); }
-.stat-item.limited .stat-value { color: var(--accent-red); }
+.stat-item .stat-label {
+  text-transform: uppercase;
+  font-size: 10px;
+  opacity: 0.7;
+  letter-spacing: 0.1em;
+}
+
+.stat-prefix {
+  opacity: 0.4;
+  font-size: 10px;
+}
 
 .stat-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  animation: stat-blink 2s step-end infinite;
 }
 
-.stat-dot.total { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan); }
-.stat-dot.available { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
-.stat-dot.limited { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+@keyframes stat-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.stat-dot.total { background: var(--accent-cyan); box-shadow: 0 0 6px var(--accent-cyan); }
+.stat-dot.available { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+.stat-dot.limited { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
 
 /* ---------- Side Panel ---------- */
 .panel {
@@ -210,13 +262,17 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.1);
 }
 
 .panel-header h2 {
-  font-size: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
 .panel-body {
@@ -253,117 +309,241 @@ html, body {
   line-height: 1.5;
 }
 
-/* ---------- Account Cards ---------- */
+/* ---------- Account Cards — Hacker Terminal Style ---------- */
 .account-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 0;
   transition: all var(--transition-normal);
-  animation: slide-in 0.3s ease both;
+  animation: card-boot 0.4s ease both;
+  overflow: hidden;
 }
 
-@keyframes slide-in {
-  from {
+/* Scanline overlay */
+.account-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.01) 3px,
+    rgba(255,255,255,0.01) 6px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Animated border gradient (mimics data flow) */
+.account-card::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border-radius: 3px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.account-card:hover::after {
+  opacity: 1;
+}
+
+@keyframes card-boot {
+  0% {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateX(-8px);
+    filter: blur(2px);
   }
-  to {
+  60% {
     opacity: 1;
-    transform: translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    transform: translateX(0);
   }
 }
 
 .account-card:hover {
-  border-color: var(--border-glass);
-  box-shadow: var(--shadow-card);
-  transform: translateY(-2px);
+  transform: translateX(4px);
 }
 
+/* Status-specific styling */
 .account-card.status-available {
-  border-left: 3px solid var(--accent-green);
+  border-color: rgba(52, 211, 153, 0.25);
+  box-shadow: inset 0 0 30px rgba(52, 211, 153, 0.03), 0 0 1px rgba(52, 211, 153, 0.2);
+}
+
+.account-card.status-available:hover {
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: inset 0 0 30px rgba(52, 211, 153, 0.06), 0 0 15px rgba(52, 211, 153, 0.1);
 }
 
 .account-card.status-limited {
-  border-left: 3px solid var(--accent-red);
+  border-color: rgba(248, 113, 113, 0.25);
+  box-shadow: inset 0 0 30px rgba(248, 113, 113, 0.03), 0 0 1px rgba(248, 113, 113, 0.2);
 }
 
-.card-top {
+.account-card.status-limited:hover {
+  border-color: rgba(248, 113, 113, 0.5);
+  box-shadow: inset 0 0 30px rgba(248, 113, 113, 0.06), 0 0 15px rgba(248, 113, 113, 0.1);
+}
+
+/* Card header bar (like a terminal title bar) */
+.card-header-bar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  padding: 6px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid;
+}
+
+.account-card.status-available .card-header-bar {
+  background: rgba(52, 211, 153, 0.06);
+  color: var(--accent-green);
+  border-bottom-color: rgba(52, 211, 153, 0.12);
+}
+
+.account-card.status-limited .card-header-bar {
+  background: rgba(248, 113, 113, 0.06);
+  color: var(--accent-red);
+  border-bottom-color: rgba(248, 113, 113, 0.12);
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+
+.account-card.status-available .card-status-indicator {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  animation: indicator-pulse 2s ease-in-out infinite;
+}
+
+.account-card.status-limited .card-status-indicator {
+  background: var(--accent-red);
+  box-shadow: 0 0 6px var(--accent-red);
+  animation: indicator-pulse-red 1.5s ease-in-out infinite;
+}
+
+@keyframes indicator-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-green); }
+  50% { opacity: 0.3; box-shadow: 0 0 2px var(--accent-green); }
+}
+
+@keyframes indicator-pulse-red {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--accent-red); }
+  50% { opacity: 0.4; box-shadow: 0 0 2px var(--accent-red); }
+}
+
+.card-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* Card body content */
+.card-body {
+  padding: 12px 14px;
 }
 
 .card-name {
-  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.card-actions {
+.card-name-prefix {
+  color: var(--accent-cyan);
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.card-meta {
   display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
-.card-status {
-  display: inline-flex;
+.card-meta-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 20px;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
+  color: var(--text-muted);
+}
+
+.card-meta-key {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  min-width: 50px;
+}
+
+.card-meta-value {
+  color: var(--text-secondary);
+}
+
+.card-meta-value.status-text {
   font-weight: 600;
-  text-transform: uppercase;
+}
+
+.card-meta-value.status-text.available {
+  color: var(--accent-green);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
+}
+
+.card-meta-value.status-text.limited {
+  color: var(--accent-red);
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.3);
+}
+
+/* Card footer with hex-like ID */
+.card-footer {
+  padding: 4px 14px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.35;
+  border-top: 1px solid var(--border-subtle);
   letter-spacing: 0.05em;
 }
 
-.card-status.available {
-  background: var(--accent-green-dim);
-  color: var(--accent-green);
+/* Glitch animation for limited cards */
+.account-card.status-limited .card-name {
+  animation: text-glitch 8s ease-in-out infinite;
 }
 
-.card-status.limited {
-  background: var(--accent-red-dim);
-  color: var(--accent-red);
-}
-
-.card-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.card-status.available .card-status-dot {
-  background: var(--accent-green);
-  box-shadow: 0 0 6px var(--accent-green);
-  animation: pulse-green 2s ease-in-out infinite;
-}
-
-.card-status.limited .card-status-dot {
-  background: var(--accent-red);
-  box-shadow: 0 0 6px var(--accent-red);
-}
-
-@keyframes pulse-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.card-time {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.card-time svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
+@keyframes text-glitch {
+  0%, 95%, 100% { opacity: 1; transform: none; }
+  96% { opacity: 0.8; transform: translateX(2px); }
+  97% { opacity: 1; transform: translateX(-1px); }
+  98% { opacity: 0.9; transform: none; }
 }
 
 /* ---------- Buttons ---------- */
@@ -457,13 +637,13 @@ html, body {
 .btn-icon.edit:hover { color: var(--accent-cyan); }
 .btn-icon.delete:hover { color: var(--accent-red); }
 
-/* ---------- Modal ---------- */
+/* ---------- Modal — Hacker Terminal Style ---------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -480,14 +660,35 @@ html, body {
 }
 
 .modal {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  padding: 24px;
+  position: relative;
+  background: #0c1220;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 3px;
+  padding: 0;
   width: 90%;
   max-width: 420px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), var(--shadow-glow-cyan);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 30px rgba(56, 189, 248, 0.08);
   animation: modal-in 0.25s ease;
+  overflow: hidden;
+}
+
+/* Scanline overlay on modal */
+.modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.008) 3px,
+    rgba(255,255,255,0.008) 6px
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .modal-sm {
@@ -498,10 +699,12 @@ html, body {
   from {
     opacity: 0;
     transform: scale(0.95) translateY(10px);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+    filter: blur(0);
   }
 }
 
@@ -509,74 +712,145 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+  background: rgba(56, 189, 248, 0.04);
 }
 
 .modal-header h3 {
-  font-size: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.modal-header .btn-icon {
+  color: var(--text-muted);
+}
+
+.modal-header .btn-icon:hover {
+  color: var(--accent-red);
+}
+
+.modal-body {
+  padding: 20px;
 }
 
 .confirm-text {
   color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.5;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
   margin-bottom: 20px;
+  padding: 0 20px;
 }
 
-/* ---------- Form ---------- */
+/* ---------- Form — Hacker Terminal Style ---------- */
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .form-group label {
-  display: block;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
+  letter-spacing: 0.1em;
+  color: var(--accent-cyan);
+  margin-bottom: 8px;
+  opacity: 0.7;
+}
+
+.form-group label::before {
+  content: '>';
+  color: var(--accent-cyan);
+  opacity: 0.4;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  border-radius: 2px;
   color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: all var(--transition-fast);
+  letter-spacing: 0.02em;
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-style: italic;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 3px var(--accent-cyan-dim);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.08), inset 0 0 20px rgba(56, 189, 248, 0.03);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .form-group select {
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
 }
 
 .form-group select option {
-  background: var(--bg-secondary);
+  background: #0c1220;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Time input group — cleaner layout */
+.form-time-group {
+  position: relative;
+}
+
+.form-time-group input[type="datetime-local"] {
+  font-variant-numeric: tabular-nums;
+}
+
+.form-time-group input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(3) hue-rotate(160deg);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.form-time-group input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .form-hint {
-  display: block;
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 6px;
+  opacity: 0.5;
+}
+
+.form-hint::before {
+  content: '//';
+  color: var(--accent-cyan);
+  opacity: 0.4;
 }
 
 .form-actions {
@@ -584,6 +858,28 @@ html, body {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(56, 189, 248, 0.08);
+}
+
+/* Hacker-style buttons in forms */
+.form-actions .btn-primary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 2px;
+  padding: 8px 20px;
+}
+
+.form-actions .btn-secondary {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 2px;
+  border-color: rgba(56, 189, 248, 0.12);
+  background: transparent;
 }
 
 /* ---------- Responsive ---------- */

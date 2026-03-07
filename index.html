@@ -58,7 +58,7 @@
     <div id="modal-overlay" class="modal-overlay hidden">
       <div class="modal" id="modal">
         <div class="modal-header">
-          <h3 id="modal-title">Add Account</h3>
+          <h3 id="modal-title">// new_account</h3>
           <button id="btn-modal-close" class="btn-icon" title="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -66,29 +66,31 @@
             </svg>
           </button>
         </div>
-        <form id="account-form">
-          <div class="form-group">
-            <label for="input-name">Account Name</label>
-            <input type="text" id="input-name" placeholder="e.g. Gmail Pro #1" required />
-          </div>
-          <div class="form-group">
-            <label for="input-status">Status</label>
-            <select id="input-status" required>
-              <option value="available">✅ Available</option>
-              <option value="limited">🔴 Limited (Exhausted)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="input-time">Limit / Reset Time</label>
-            <input type="datetime-local" id="input-time" />
-            <span class="form-hint">When the limit resets or was exhausted</span>
-          </div>
-          <input type="hidden" id="input-id" />
-          <div class="form-actions">
-            <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Save</button>
-          </div>
-        </form>
+        <div class="modal-body">
+          <form id="account-form">
+            <div class="form-group">
+              <label for="input-name">account_name</label>
+              <input type="text" id="input-name" placeholder="gmail_pro_01" required />
+            </div>
+            <div class="form-group">
+              <label for="input-status">status</label>
+              <select id="input-status" required>
+                <option value="available">● ACTIVE — available</option>
+                <option value="limited">✕ BLOCKED — limit reached</option>
+              </select>
+            </div>
+            <div class="form-group form-time-group">
+              <label for="input-time">timestamp</label>
+              <input type="datetime-local" id="input-time" />
+              <span class="form-hint">limit reset or exhaustion time</span>
+            </div>
+            <input type="hidden" id="input-id" />
+            <div class="form-actions">
+              <button type="button" id="btn-cancel" class="btn-secondary">Abort</button>
+              <button type="submit" class="btn-primary">Execute</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -96,12 +98,14 @@
     <div id="confirm-overlay" class="modal-overlay hidden">
       <div class="modal modal-sm">
         <div class="modal-header">
-          <h3>Delete Account</h3>
+          <h3>// confirm_delete</h3>
         </div>
-        <p id="confirm-message" class="confirm-text">Are you sure you want to delete this account?</p>
-        <div class="form-actions">
-          <button id="btn-confirm-cancel" class="btn-secondary">Cancel</button>
-          <button id="btn-confirm-delete" class="btn-danger">Delete</button>
+        <div class="modal-body">
+          <p id="confirm-message" class="confirm-text">terminate account process?</p>
+          <div class="form-actions">
+            <button id="btn-confirm-cancel" class="btn-secondary">Abort</button>
+            <button id="btn-confirm-delete" class="btn-danger">Confirm</button>
+          </div>
         </div>
       </div>
     </div>

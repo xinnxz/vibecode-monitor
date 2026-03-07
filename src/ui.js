@@ -116,17 +116,23 @@ function renderStats() {
   statsBarEl.innerHTML = `
     <div class="stat-item total">
       <span class="stat-dot total"></span>
-      <span class="stat-label">Total</span>
+      <span class="stat-prefix">[</span>
+      <span class="stat-label">SYS</span>
+      <span class="stat-prefix">]</span>
       <span class="stat-value">${stats.total}</span>
     </div>
     <div class="stat-item available">
       <span class="stat-dot available"></span>
-      <span class="stat-label">Available</span>
+      <span class="stat-prefix">[</span>
+      <span class="stat-label">ACT</span>
+      <span class="stat-prefix">]</span>
       <span class="stat-value">${stats.available}</span>
     </div>
     <div class="stat-item limited">
       <span class="stat-dot limited"></span>
-      <span class="stat-label">Limited</span>
+      <span class="stat-prefix">[</span>
+      <span class="stat-label">LMT</span>
+      <span class="stat-prefix">]</span>
       <span class="stat-value">${stats.limited}</span>
     </div>
   `;
@@ -148,7 +154,7 @@ function renderAccountList(accounts) {
           <circle cx="12" cy="12" r="10" />
           <path d="M12 8v4M12 16h.01" />
         </svg>
-        <p>No accounts yet.<br>Click <strong>+ Add</strong> to start monitoring.</p>
+        <p style="font-family:'JetBrains Mono',monospace;font-size:12px;">// no accounts registered<br>// run <strong style="color:var(--accent-cyan)">+ Add</strong> to begin</p>
       </div>
     `;
     return;
@@ -156,17 +162,21 @@ function renderAccountList(accounts) {
 
   accountListEl.innerHTML = accounts
     .map(
-      (account, index) => `
-    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.05}s">
-      <div class="card-top">
-        <div>
-          <div class="card-name">${escapeHtml(account.name)}</div>
-          <span class="card-status ${account.status}">
-            <span class="card-status-dot"></span>
-            ${account.status === 'available' ? 'Available' : 'Limited'}
-          </span>
+      (account, index) => {
+        const isAvailable = account.status === 'available';
+        const statusLabel = isAvailable ? 'ONLINE' : 'BLOCKED';
+        const statusTextClass = isAvailable ? 'available' : 'limited';
+        const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
+
+        return `
+    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.08}s">
+      <!-- Terminal-style header bar -->
+      <div class="card-header-bar">
+        <div class="card-header-left">
+          <span class="card-status-indicator"></span>
+          <span>${statusLabel}</span>
         </div>
-        <div class="card-actions">
+        <div class="card-header-actions">
           <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${account.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -181,17 +191,32 @@ function renderAccountList(accounts) {
           </button>
         </div>
       </div>
-      ${account.limitTime ? `
-        <div class="card-time">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          <span>${formatDateTime(account.limitTime)}</span>
+
+      <!-- Card body with terminal-like meta info -->
+      <div class="card-body">
+        <div class="card-name">
+          <span class="card-name-prefix">&gt;</span>
+          ${escapeHtml(account.name)}
         </div>
-      ` : ''}
+        <div class="card-meta">
+          <div class="card-meta-row">
+            <span class="card-meta-key">status</span>
+            <span class="card-meta-value status-text ${statusTextClass}">${isAvailable ? '● ACTIVE' : '✕ LIMITED'}</span>
+          </div>
+          ${account.limitTime ? `
+          <div class="card-meta-row">
+            <span class="card-meta-key">time</span>
+            <span class="card-meta-value">${formatDateTime(account.limitTime)}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Footer with hex ID -->
+      <div class="card-footer">0x${shortId}</div>
     </div>
-  `
+  `;
+      }
     )
     .join('');
 
@@ -233,7 +258,7 @@ function openModal(editId = null) {
     const account = accounts.find((a) => a.id === editId);
     if (!account) return;
 
-    modalTitle.textContent = 'Edit Account';
+    modalTitle.textContent = '// edit_account';
     inputName.value = account.name;
     inputStatus.value = account.status;
     inputTime.value = account.limitTime
@@ -242,7 +267,7 @@ function openModal(editId = null) {
     inputId.value = account.id;
   } else {
     // Mode Add
-    modalTitle.textContent = 'Add Account';
+    modalTitle.textContent = '// new_account';
   }
 
   modalOverlay.classList.remove('hidden');
@@ -298,7 +323,7 @@ function openConfirm(id) {
   const account = accounts.find((a) => a.id === id);
   if (account) {
     document.getElementById('confirm-message').textContent =
-      `Are you sure you want to delete "${account.name}"?`;
+      `terminate process "${account.name}"?`;
   }
 
   confirmOverlay.classList.remove('hidden');
