@@ -278,25 +278,14 @@ export function updateAccountVisuals(accounts) {
 
   if (!accounts || accounts.length === 0) return;
 
-  const count = accounts.length;
-  // Ring radius bounded: min 2.8, max 4.5
-  // Semakin banyak akun, semakin rapat ring-nya
-  const minRadius = 2.8;
-  const maxRadius = 4.5;
-  const radiusRange = maxRadius - minRadius;
-
-  // Opacity berkurang kalau banyak ring (supaya tidak terlalu ramai)
-  const baseOpacity = Math.max(0.15, 0.6 - count * 0.02);
-
-  // Golden angle distribution (137.5°) supaya tilt tersebar merata
-  const goldenAngle = 137.508 * (Math.PI / 180);
+  const baseRadius = 2.8;
 
   accounts.forEach((account, index) => {
     const color = account.status === 'available' ? COLORS.available : COLORS.limited;
     
-    // Radius terdistribusi merata dalam range [minRadius, maxRadius]
-    const t = count === 1 ? 0 : index / (count - 1);
-    const ringRadius = minRadius + t * radiusRange;
+    // --- Ring orbit ---
+    // Setiap ring di-offset radius sedikit dan tilt berbeda
+    const ringRadius = baseRadius + index * 0.25;
     const segments = 128;
     const ringPoints = [];
 
@@ -315,43 +304,44 @@ export function updateAccountVisuals(accounts) {
     const ringMat = new THREE.LineBasicMaterial({
       color: color,
       transparent: true,
-      opacity: baseOpacity,
+      opacity: 0.6,
     });
     const ring = new THREE.Line(ringGeo, ringMat);
 
-    // Golden angle tilt: setiap ring di-rotasi dengan distribusi golden ratio
-    // Ini mencegah ring berkumpul di sudut yang sama
-    const tiltAngle = goldenAngle * index;
-    const tiltX = Math.sin(tiltAngle) * 1.2 + 0.3;
-    const tiltZ = Math.cos(tiltAngle) * 0.8;
+    // Tilt ring di sudut berbeda supaya tidak overlap
+    // Setiap ring diputar di sumbu X dan Z
+    const tiltX = (index * 35 + 15) * (Math.PI / 180);
+    const tiltZ = (index * 25) * (Math.PI / 180);
     ring.rotation.x = tiltX;
     ring.rotation.z = tiltZ;
 
     ringGroup.add(ring);
 
-    // --- Glowing point (penanda posisi) ---
-    const pointSize = Math.max(0.03, 0.06 - count * 0.001);
-    const pointGeo = new THREE.SphereGeometry(pointSize, 12, 12);
+    // --- Glowing point di ring (penanda posisi) ---
+    const pointGeo = new THREE.SphereGeometry(0.06, 16, 16);
     const pointMat = new THREE.MeshBasicMaterial({
       color: color,
       transparent: true,
-      opacity: Math.min(0.9, baseOpacity + 0.3),
+      opacity: 0.9,
     });
     const point = new THREE.Mesh(pointGeo, pointMat);
+
+    // Posisi awal di ring
     point.position.set(ringRadius, 0, 0);
+    // Simpan metadata untuk animasi
     point.userData = {
       ringRadius,
-      speed: 0.2 + index * 0.08,
-      offset: index * 1.2,
+      speed: 0.3 + index * 0.15,
+      offset: index * 1.5,
     };
     ring.add(point);
 
-    // --- Glow point ---
-    const glowPointGeo = new THREE.SphereGeometry(pointSize * 2.5, 12, 12);
+    // --- Glow di sekitar point ---
+    const glowPointGeo = new THREE.SphereGeometry(0.15, 16, 16);
     const glowPointMat = new THREE.MeshBasicMaterial({
       color: color,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.2,
       blending: THREE.AdditiveBlending,
     });
     const glowPoint = new THREE.Mesh(glowPointGeo, glowPointMat);
