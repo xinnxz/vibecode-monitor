@@ -255,6 +255,7 @@ html, body {
   display: flex;
   flex-direction: column;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
 
 .panel-header {
@@ -263,6 +264,7 @@ html, body {
   justify-content: space-between;
   padding: 20px 24px 16px;
   border-bottom: 1px solid rgba(56, 189, 248, 0.1);
+  flex-shrink: 0;
 }
 
 .panel-header h2 {
@@ -277,27 +279,12 @@ html, body {
 
 .panel-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 10px 16px;
+  padding: 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  scroll-behavior: smooth;
-  /* Mask dengan gradient fade di atas dan bawah untuk efek scroll halus */
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 12px,
-    black calc(100% - 12px),
-    transparent 100%
-  );
+  gap: 12px;
 }
 
 /* Empty state */
@@ -419,9 +406,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border-bottom: 1px solid;
@@ -480,21 +467,18 @@ html, body {
 
 /* Card body content */
 .card-body {
-  padding: 8px 10px;
+  padding: 12px 14px;
 }
 
 .card-name {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 8px;
 }
 
 .card-name-prefix {
@@ -506,15 +490,15 @@ html, body {
 .card-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .card-meta-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -544,11 +528,11 @@ html, body {
 
 /* Card footer with hex-like ID */
 .card-footer {
-  padding: 3px 10px 4px;
+  padding: 4px 14px 6px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-muted);
-  opacity: 0.3;
+  opacity: 0.35;
   border-top: 1px solid var(--border-subtle);
   letter-spacing: 0.05em;
 }
