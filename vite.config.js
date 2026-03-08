@@ -1,15 +1,16 @@
 import { defineConfig } from 'vite';
 
 /**
- * Vite Configuration untuk GitHub Pages.
+ * Vite Configuration.
  * 
  * `base`: path prefix saat di-deploy.
- * Di GitHub Pages, URL-nya jadi: https://xinnx.github.io/vibecode-monitor/
- * Jadi base harus '/vibecode-monitor/' (nama repo).
+ * - GitHub Pages: URL = https://xinnxz.github.io/vibecode-monitor/ → base '/vibecode-monitor/'
+ * - Vercel/lainnya: URL = https://domain.vercel.app/ → base '/'
  * 
- * Tanpa ini, semua asset (CSS, JS, fonts) akan 404 di GitHub Pages
- * karena mereka akan cari di root '/' padahal seharusnya '/vibecode-monitor/'.
+ * Kita deteksi via env var GITHUB_ACTIONS yang otomatis ada di GitHub Actions CI.
  */
+const isGitHubPages = process.env.GITHUB_ACTIONS === 'true';
+
 export default defineConfig({
-  base: '/vibecode-monitor/',
+  base: isGitHubPages ? '/vibecode-monitor/' : '/',
 });
