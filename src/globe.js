@@ -1,63 +1,134 @@
 /**
- * globe.js — Three.js Globe Visualization Module
- * 
- * Membuat scene 3D dengan:
- * 1. Sphere wireframe transparan dengan glow effect
- * 2. Ring/orbit yang mengelilingi globe (menampilkan status akun)
- * 3. Partikel ambient untuk efek futuristik
- * 4. OrbitControls untuk interaksi user (drag rotate)
- * 5. Auto-rotate animation
- * 
+ * globe.js — Three.js Globe Visualization Module (Redesigned)
+ *
+ * Berdasarkan 3d-earth project (GhostCat) yang diadaptasi untuk Vibe Code Monitor.
+ *
+ * Fitur:
+ * 1. Earth sphere dengan texture bumi + custom GLSL shader (scan line + Fresnel glow)
+ * 2. Atmospheric glow (Fresnel shader + sprite)
+ * 3. Light pillars di titik kota Indonesia (per account)
+ * 4. Fly arcs antar kota
+ * 5. Satellite orbits (3 ring + rotating dots)
+ * 6. Wave ripple animation
+ * 7. Star particles
+ * 8. Labels (nama account sebagai sprite, muncul saat hover)
+ * 9. GSAP entry animation
+ *
  * Export: initGlobe(container), updateAccountVisuals(accounts)
  */
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import gsap from 'gsap';
 
-// --- Module-level variables ---
-let scene, camera, renderer, controls;
-let globe, glowMesh, innerGlobe;
-let ringGroup;
-let particles;
-let animationId;
+import {
+  lon2xyz,
+  createLightPillar,
+  createWaveMesh,
+  createPointMesh,
+  flyArc,
+  getCirclePoints,
+  createAnimateLine,
+  INDONESIAN_CITIES,
+} from './globe-utils.js';
 
-// Warna sesuai status
-const COLORS = {
-  available: new THREE.Color(0x34d399),   // Hijau
-  limited: new THREE.Color(0xf87171),     // Merah
-  default: new THREE.Color(0x38bdf8),     // Cyan (default/empty)
-  glow: new THREE.Color(0x38bdf8),        // Glow warna cyan
+// ============================================================
+// CONFIG
+// ============================================================
+
+const CONFIG = {
+  earth: {
+    radius: 50,
+    rotateSpeed: 0.002,
+  },
+  satellite: {
+    rotateSpeed: -0.01,
+    size: 1,
+    number: 2,
+  },
+  flyLine: {
+    color: 0xf3ae76,
+    flyLineColor: 0xff7714,
+    speed: 0.004,
+  },
+  punctuation: {
+    circleColor: 0x3892ff,
+    lightColumn: {
+      startColor: 0x00ffcc, // Cyan-hijau (available)
+      endColor: 0xff4444,   // Merah (limited)
+    },
+  },
 };
 
+// ============================================================
+// MODULE VARIABLES
+// ============================================================
+
+let scene, camera, renderer, controls;
+let earthGroup, mainGroup;
+let earthMesh;
+let starPoints;
+let waveMeshArr = [];
+let circleLineList = [];
+let flyLineArcGroup;
+let markupPointGroup;
+let labelSprites = [];
+let timeValue = 100;
+let textures = {};
+
+// Shader uniforms untuk scan line animation
+let uniforms;
+
+// ============================================================
+// TEXTURE LOADER
+// ============================================================
+
 /**
- * Inisialisasi Three.js Scene.
- * 
- * Penjelasan:
- * - Scene: "wadah" 3D tempat semua object berada
- * - Camera: "mata" yang melihat scene (PerspectiveCamera = seperti mata manusia)
- * - Renderer: merender scene ke canvas HTML
- * - OrbitControls: memungkinkan user drag untuk rotate view
- * 
- * @param {HTMLElement} container - DOM element untuk menampung canvas
+ * Load semua texture yang dibutuhkan.
+ * TextureLoader Three.js menggunakan callback pattern.
+ */
+function loadTextures() {
+  const loader = new THREE.TextureLoader();
+  const basePath = import.meta.env.BASE_URL + 'textures/';
+
+  return {
+    earth: loader.load(basePath + 'earth.jpg'),
+    glow: loader.load(basePath + 'glow.png'),
+    gradient: loader.load(basePath + 'gradient.png'),
+    aperture: loader.load(basePath + 'aperture.png'),
+    light_column: loader.load(basePath + 'light_column.png'),
+    label: loader.load(basePath + 'label.png'),
+    redCircle: loader.load(basePath + 'redCircle.png'),
+  };
+}
+
+// ============================================================
+// INIT GLOBE
+// ============================================================
+
+/**
+ * Inisialisasi globe scene.
+ *
+ * @param {HTMLElement} container
  * @returns {{ scene, camera, renderer, updateVisuals }}
  */
 export function initGlobe(container) {
-  // --- Scene Setup ---
+  textures = loadTextures();
+
+  // --- Scene ---
   scene = new THREE.Scene();
-  // Fog untuk depth effect (object jauh jadi kabur)
-  scene.fog = new THREE.FogExp2(0x0a0e17, 0.035);
+  scene.fog = new THREE.FogExp2(0x0a0e17, 0.002);
 
   // --- Camera ---
-  // PerspectiveCamera(fov, aspect, near, far)
-  // fov = field of view (derajat), aspect = rasio layar
   const aspect = getAspect();
-  camera = new THREE.PerspectiveCamera(55, aspect, 0.1, 1000);
-  camera.position.set(0, 2, 8);
+  camera = new THREE.PerspectiveCamera(45, aspect, 1, 2000);
+  camera.position.set(0, 20, 160);
+  camera.lookAt(0, 0, 0);
 
   // --- Renderer ---
   renderer = new THREE.WebGLRenderer({
-    antialias: true,          // Smoothing edges
-    alpha: true,              // Transparent background
+    antialias: true,
+    alpha: true,
     powerPreference: 'high-performance',
   });
   renderer.setSize(getWidth(), window.innerHeight);
@@ -68,38 +139,45 @@ export function initGlobe(container) {
 
   // --- Controls ---
   controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;        // Smooth inertia saat drag
+  controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.enablePan = false;           // Disable panning (hanya rotate)
-  controls.minDistance = 4;             // Jarak minimum zoom
-  controls.maxDistance = 15;            // Jarak maximum zoom
-  controls.autoRotate = true;           // Auto rotate
-  controls.autoRotateSpeed = 0.5;       // Kecepatan auto rotate
+  controls.enablePan = false;
+  controls.minDistance = 80;
+  controls.maxDistance = 300;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.5;
 
-  // --- Lighting ---
-  // AmbientLight: cahaya merata dari semua arah
-  const ambient = new THREE.AmbientLight(0x334466, 0.6);
-  scene.add(ambient);
+  // --- Groups ---
+  mainGroup = new THREE.Group();
+  mainGroup.name = 'mainGroup';
+  mainGroup.scale.set(0, 0, 0); // Start hidden for GSAP animation
+  scene.add(mainGroup);
 
-  // PointLight: seperti lampu bohlam, ada posisi & jarak jangkau
-  const pointLight = new THREE.PointLight(0x38bdf8, 2, 50);
-  pointLight.position.set(5, 5, 5);
-  scene.add(pointLight);
+  earthGroup = new THREE.Group();
+  earthGroup.name = 'earthGroup';
+  mainGroup.add(earthGroup);
 
-  const pointLight2 = new THREE.PointLight(0x34d399, 1.5, 50);
-  pointLight2.position.set(-5, -3, 3);
-  scene.add(pointLight2);
+  markupPointGroup = new THREE.Group();
+  markupPointGroup.name = 'markupPoints';
 
-  // --- Build Scene Objects ---
-  createGlobe();
-  createParticles();
-  ringGroup = new THREE.Group();
-  scene.add(ringGroup);
+  flyLineArcGroup = new THREE.Group();
+  flyLineArcGroup.userData.flyLineArray = [];
+  earthGroup.add(flyLineArcGroup);
+
+  // --- Build Scene ---
+  createEarth();
+  createEarthGlow();
+  createEarthAperture();
+  createStars();
+  createSatelliteOrbits();
+
+  // --- GSAP Entry Animation ---
+  showEntryAnimation();
 
   // --- Events ---
   window.addEventListener('resize', onResize);
 
-  // --- Start Animation Loop ---
+  // --- Start Animation ---
   animate();
 
   return {
@@ -110,9 +188,458 @@ export function initGlobe(container) {
   };
 }
 
+// ============================================================
+// EARTH SPHERE + SHADER
+// ============================================================
+
+function createEarth() {
+  const R = CONFIG.earth.radius;
+
+  // --- Point border (dot border around earth) ---
+  const borderGeo = new THREE.SphereGeometry(R + 10, 60, 60);
+  const borderMat = new THREE.PointsMaterial({
+    color: 0x81ffff,
+    transparent: true,
+    sizeAttenuation: true,
+    opacity: 0.1,
+    vertexColors: false,
+    size: 0.01,
+  });
+  const borderPoints = new THREE.Points(borderGeo, borderMat);
+  earthGroup.add(borderPoints);
+
+  // --- Shader Uniforms ---
+  uniforms = {
+    glowColor: { value: new THREE.Color(0x0cd1eb) },
+    scale: { type: 'f', value: -1.0 },
+    bias: { type: 'f', value: 1.0 },
+    power: { type: 'f', value: 3.3 },
+    time: { type: 'f', value: timeValue },
+    isHover: { value: false },
+    map: { value: textures.earth },
+  };
+
+  // --- Earth Mesh with custom ShaderMaterial ---
+  const earthGeo = new THREE.SphereGeometry(R, 50, 50);
+
+  // Vertex Shader: pass UV, normal, position to fragment
+  const vertexShader = `
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vp;
+    varying vec3 vPositionNormal;
+    void main(void) {
+      vUv = uv;
+      vNormal = normalize(normalMatrix * normal);
+      vp = position;
+      vPositionNormal = normalize((modelViewMatrix * vec4(position, 1.0)).xyz);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  // Fragment Shader: Fresnel glow + scan line + earth texture
+  const fragmentShader = `
+    uniform vec3 glowColor;
+    uniform float bias;
+    uniform float power;
+    uniform float time;
+    varying vec3 vp;
+    varying vec3 vNormal;
+    varying vec3 vPositionNormal;
+    uniform float scale;
+    uniform sampler2D map;
+    varying vec2 vUv;
+
+    void main(void) {
+      // Fresnel glow: tepi bumi lebih terang
+      float a = pow(bias + scale * abs(dot(vNormal, vPositionNormal)), power);
+
+      // Scan line: garis cahaya bergerak vertikal
+      if (vp.y > time && vp.y < time + 20.0) {
+        float t = smoothstep(0.0, 0.8, (1.0 - abs(0.5 - (vp.y - time) / 20.0)) / 3.0);
+        gl_FragColor = mix(gl_FragColor, vec4(glowColor, 1.0), t * t);
+      }
+
+      // Apply glow
+      gl_FragColor = mix(gl_FragColor, vec4(glowColor, 1.0), a);
+
+      // Apply earth texture
+      gl_FragColor = gl_FragColor + texture2D(map, vUv);
+    }
+  `;
+
+  const earthMat = new THREE.ShaderMaterial({
+    uniforms: uniforms,
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+  });
+
+  earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  earthMesh.name = 'earth';
+  earthGroup.add(earthMesh);
+}
+
+// ============================================================
+// ATMOSPHERIC GLOW
+// ============================================================
+
+function createEarthGlow() {
+  const R = CONFIG.earth.radius;
+
+  // Sprite glow (simple overlay)
+  const spriteMaterial = new THREE.SpriteMaterial({
+    map: textures.glow,
+    color: 0x4390d1,
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(spriteMaterial);
+  sprite.scale.set(R * 3.0, R * 3.0, 1);
+  earthGroup.add(sprite);
+}
+
+function createEarthAperture() {
+  const R = CONFIG.earth.radius;
+
+  // Atmosphere shader (Fresnel-like glow around earth)
+  const vertexShader = `
+    varying vec3 vVertexWorldPosition;
+    varying vec3 vVertexNormal;
+    void main() {
+      vVertexNormal = normalize(normalMatrix * normal);
+      vVertexWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    uniform vec3 glowColor;
+    uniform float coeficient;
+    uniform float power;
+    varying vec3 vVertexNormal;
+    varying vec3 vVertexWorldPosition;
+    void main() {
+      vec3 worldCameraToVertex = vVertexWorldPosition - cameraPosition;
+      vec3 viewCameraToVertex = (viewMatrix * vec4(worldCameraToVertex, 0.0)).xyz;
+      viewCameraToVertex = normalize(viewCameraToVertex);
+      float intensity = pow(coeficient + dot(vVertexNormal, viewCameraToVertex), power);
+      gl_FragColor = vec4(glowColor, intensity);
+    }
+  `;
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      coeficient: { type: 'f', value: 1.0 },
+      power: { type: 'f', value: 3 },
+      glowColor: { type: 'c', value: new THREE.Color(0x4390d1) },
+    },
+    vertexShader,
+    fragmentShader,
+    blending: THREE.NormalBlending,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const sphere = new THREE.SphereGeometry(R, 50, 50);
+  const mesh = new THREE.Mesh(sphere, material);
+  earthGroup.add(mesh);
+}
+
+// ============================================================
+// STARS
+// ============================================================
+
+function createStars() {
+  const vertices = [];
+  const colors = [];
+  for (let i = 0; i < 500; i++) {
+    vertices.push(
+      800 * Math.random() - 300,
+      800 * Math.random() - 300,
+      800 * Math.random() - 300
+    );
+    colors.push(1, 1, 1);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 2,
+    sizeAttenuation: true,
+    color: 0x4d76cf,
+    transparent: true,
+    opacity: 1,
+    map: textures.gradient,
+  });
+
+  starPoints = new THREE.Points(geo, mat);
+  starPoints.name = 'stars';
+  mainGroup.add(starPoints);
+}
+
+// ============================================================
+// SATELLITE ORBITS
+// ============================================================
+
+function createSatelliteOrbits() {
+  const R = CONFIG.earth.radius;
+  const list = getCirclePoints({ radius: R + 15, number: 150, closed: true });
+
+  const mat = new THREE.MeshBasicMaterial({
+    color: '#0c3172',
+    transparent: true,
+    opacity: 0.4,
+    side: THREE.DoubleSide,
+  });
+
+  const line = createAnimateLine({ pointList: list, material: mat, number: 100, radius: 0.1 });
+  earthGroup.add(line);
+
+  const l2 = line.clone();
+  l2.scale.set(1.2, 1.2, 1.2);
+  l2.rotateZ(Math.PI / 6);
+  earthGroup.add(l2);
+
+  const l3 = line.clone();
+  l3.scale.set(0.8, 0.8, 0.8);
+  l3.rotateZ(-Math.PI / 6);
+  earthGroup.add(l3);
+
+  // Satellite balls
+  const ballColors = [0xe0b187, 0x628fbb, 0x806bdf];
+  const lines = [line, l2, l3];
+
+  lines.forEach((ringLine, idx) => {
+    for (let i = 0; i < CONFIG.satellite.number; i++) {
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(CONFIG.satellite.size, 32, 32),
+        new THREE.MeshBasicMaterial({ color: ballColors[idx] })
+      );
+      const num = Math.floor(list.length / CONFIG.satellite.number);
+      const pos = list[num * (i + 1)] || list[0];
+      ball.position.set(pos[0], pos[1], pos[2]);
+      ringLine.add(ball);
+    }
+    circleLineList.push(ringLine);
+  });
+}
+
+// ============================================================
+// ACCOUNT VISUALS — Light pillars, fly arcs, labels, waves
+// ============================================================
+
 /**
- * Hitung lebar canvas (dikurangi panel width di desktop).
+ * Update visual elements berdasarkan data akun.
+ * Setiap akun ditempatkan di kota Indonesia.
+ *
+ * @param {Array} accounts - Daftar akun dari accounts.js
  */
+export function updateAccountVisuals(accounts) {
+  // Clear previous visuals
+  earthGroup.remove(markupPointGroup);
+  markupPointGroup = new THREE.Group();
+  markupPointGroup.name = 'markupPoints';
+
+  // Clear fly lines
+  while (flyLineArcGroup.children.length > 0) {
+    const child = flyLineArcGroup.children[0];
+    flyLineArcGroup.remove(child);
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  }
+  flyLineArcGroup.userData.flyLineArray = [];
+
+  // Clear wave meshes
+  waveMeshArr = [];
+  labelSprites = [];
+
+  if (!accounts || accounts.length === 0) {
+    earthGroup.add(markupPointGroup);
+    return;
+  }
+
+  const R = CONFIG.earth.radius;
+  const jakartaCity = INDONESIAN_CITIES[0]; // Jakarta as hub
+
+  accounts.forEach((account, index) => {
+    const city = INDONESIAN_CITIES[index % INDONESIAN_CITIES.length];
+    const isAvailable = account.status === 'available';
+    const color = isAvailable
+      ? CONFIG.punctuation.lightColumn.startColor
+      : CONFIG.punctuation.lightColumn.endColor;
+
+    // --- Label marker (base circle) ---
+    const markerMat = new THREE.MeshBasicMaterial({
+      color: CONFIG.punctuation.circleColor,
+      map: textures.label,
+      transparent: true,
+      depthWrite: false,
+    });
+    const marker = createPointMesh({ radius: R, lon: city.E, lat: city.N, material: markerMat });
+    markupPointGroup.add(marker);
+
+    // --- Light Pillar ---
+    const pillar = createLightPillar({
+      radius: R,
+      lon: city.E,
+      lat: city.N,
+      texture: textures.light_column,
+      color: color,
+    });
+    markupPointGroup.add(pillar);
+
+    // --- Wave Ripple ---
+    const wave = createWaveMesh({
+      radius: R,
+      lon: city.E,
+      lat: city.N,
+      texture: textures.aperture,
+    });
+    markupPointGroup.add(wave);
+    waveMeshArr.push(wave);
+
+    // --- Fly Arcs (from Jakarta to other cities) ---
+    if (index > 0) {
+      const arcline = flyArc(
+        R,
+        jakartaCity.E, jakartaCity.N,
+        city.E, city.N,
+        CONFIG.flyLine
+      );
+      flyLineArcGroup.add(arcline);
+      if (arcline.userData.flyLine) {
+        flyLineArcGroup.userData.flyLineArray.push(arcline.userData.flyLine);
+      }
+    }
+
+    // --- Label Sprite (nama account) ---
+    const label = createLabelSprite(account.name, city, R);
+    markupPointGroup.add(label);
+    labelSprites.push(label);
+  });
+
+  earthGroup.add(markupPointGroup);
+}
+
+/**
+ * Buat label sprite (text) untuk ditampilkan di atas titik kota.
+ * Menggunakan CanvasTexture — render text ke canvas lalu jadikan texture.
+ *
+ * @param {string} text - Nama account
+ * @param {Object} city - { N, E } coordinates
+ * @param {number} radius - Earth radius
+ */
+function createLabelSprite(text, city, radius) {
+  // Create canvas for text rendering
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 256;
+  canvas.height = 64;
+
+  // Draw text
+  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.font = 'bold 24px JetBrains Mono, monospace';
+  ctx.fillStyle = '#38bdf8';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  // Glow effect
+  ctx.shadowColor = '#0cd1eb';
+  ctx.shadowBlur = 8;
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(material);
+
+  // Position above the city
+  const p = lon2xyz(radius * 1.15, city.E, city.N);
+  sprite.position.set(p.x, p.y, p.z);
+
+  const len = 5 + Math.max(0, text.length - 3) * 1.5;
+  sprite.scale.set(len, 2, 1);
+
+  return sprite;
+}
+
+// ============================================================
+// ENTRY ANIMATION
+// ============================================================
+
+function showEntryAnimation() {
+  gsap.to(mainGroup.scale, {
+    x: 1,
+    y: 1,
+    z: 1,
+    duration: 2,
+    ease: 'power2.out',
+  });
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  controls.update();
+
+  // Rotate earth
+  if (CONFIG.earth.rotateSpeed && earthGroup) {
+    earthGroup.rotation.y += CONFIG.earth.rotateSpeed;
+  }
+
+  // Satellite rotation
+  circleLineList.forEach((line) => {
+    line.rotateY(CONFIG.satellite.rotateSpeed);
+  });
+
+  // Scan line animation (shader uniform)
+  if (uniforms) {
+    uniforms.time.value = uniforms.time.value < -timeValue
+      ? timeValue
+      : uniforms.time.value - 1;
+  }
+
+  // Fly line animation
+  flyLineArcGroup?.userData.flyLineArray?.forEach((fly) => {
+    fly.rotation.z += CONFIG.flyLine.speed;
+    if (fly.rotation.z >= fly.flyEndAngle) fly.rotation.z = 0;
+  });
+
+  // Wave ripple animation
+  waveMeshArr.forEach((mesh) => {
+    mesh.userData.scale += 0.007;
+    const s = mesh.userData.size * mesh.userData.scale;
+    mesh.scale.set(s, s, s);
+
+    if (mesh.userData.scale <= 1.5) {
+      mesh.material.opacity = (mesh.userData.scale - 1) * 2;
+    } else if (mesh.userData.scale > 1.5 && mesh.userData.scale <= 2) {
+      mesh.material.opacity = 1 - (mesh.userData.scale - 1.5) * 2;
+    } else {
+      mesh.userData.scale = 1;
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+
 function getWidth() {
   const panelWidth = window.innerWidth > 768 ? 380 : 0;
   return window.innerWidth - panelWidth;
@@ -122,299 +649,10 @@ function getAspect() {
   return getWidth() / window.innerHeight;
 }
 
-/**
- * Membuat globe utama.
- * 
- * Terdiri dari:
- * 1. Inner globe: sphere solid gelap sebagai "isi"
- * 2. Wireframe globe: sphere wireframe transparan (grid lines)
- * 3. Glow mesh: sphere sedikit lebih besar dengan shader untuk efek glow
- */
-function createGlobe() {
-  const radius = 2.2;
-
-  // --- Inner Globe (solid, gelap) ---
-  const innerGeo = new THREE.SphereGeometry(radius * 0.98, 64, 64);
-  const innerMat = new THREE.MeshPhongMaterial({
-    color: 0x0a0e17,
-    transparent: true,
-    opacity: 0.85,
-    shininess: 10,
-  });
-  innerGlobe = new THREE.Mesh(innerGeo, innerMat);
-  scene.add(innerGlobe);
-
-  // --- Wireframe Globe ---
-  // IcosahedronGeometry memberikan wireframe yang lebih "organik" daripada SphereGeometry
-  const wireGeo = new THREE.IcosahedronGeometry(radius, 3);
-  const wireMat = new THREE.MeshBasicMaterial({
-    color: 0x38bdf8,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.12,
-  });
-  globe = new THREE.Mesh(wireGeo, wireMat);
-  scene.add(globe);
-
-  // --- Latitude/Longitude Lines ---
-  // Membuat beberapa ring horizontal dan vertikal pada globe
-  const ringMaterial = new THREE.LineBasicMaterial({
-    color: 0x38bdf8,
-    transparent: true,
-    opacity: 0.08,
-  });
-
-  // Horizontal rings (latitude) - setiap 30 derajat
-  for (let lat = -60; lat <= 60; lat += 30) {
-    const phi = (90 - lat) * (Math.PI / 180);
-    const ringRadius = radius * Math.sin(phi);
-    const y = radius * Math.cos(phi);
-
-    const curve = new THREE.EllipseCurve(0, 0, ringRadius, ringRadius, 0, 2 * Math.PI, false, 0);
-    const points = curve.getPoints(64);
-    const geo = new THREE.BufferGeometry().setFromPoints(
-      points.map((p) => new THREE.Vector3(p.x, y, p.y))
-    );
-    const line = new THREE.Line(geo, ringMaterial);
-    scene.add(line);
-  }
-
-  // --- Glow Effect ---
-  // Sphere sedikit lebih besar dengan material yang fade di edges (Fresnel-like effect)
-  const glowGeo = new THREE.SphereGeometry(radius * 1.15, 32, 32);
-  const glowMat = new THREE.ShaderMaterial({
-    uniforms: {
-      glowColor: { value: COLORS.glow },
-      viewVector: { value: camera.position },
-    },
-    vertexShader: `
-      uniform vec3 viewVector;
-      varying float intensity;
-      void main() {
-        vec3 vNormal = normalize(normalMatrix * normal);
-        vec3 vNormel = normalize(normalMatrix * viewVector);
-        intensity = pow(0.7 - dot(vNormal, vNormel), 3.0);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 glowColor;
-      varying float intensity;
-      void main() {
-        vec3 glow = glowColor * intensity;
-        gl_FragColor = vec4(glow, intensity * 0.4);
-      }
-    `,
-    side: THREE.BackSide, // Render di sisi belakang = efek glow ke luar
-    blending: THREE.AdditiveBlending,
-    transparent: true,
-  });
-  glowMesh = new THREE.Mesh(glowGeo, glowMat);
-  scene.add(glowMesh);
-}
-
-/**
- * Membuat sistem partikel untuk efek ambient.
- * 
- * Partikel = titik-titik kecil yang berserakan di ruang 3D.
- * Menggunakan BufferGeometry (lebih efisien daripada Geometry biasa)
- * karena data langsung disimpan dalam Float32Array.
- */
-function createParticles() {
-  const count = 1500;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-
-  for (let i = 0; i < count; i++) {
-    // Posisi random di sekitar scene (range -20 to 20)
-    positions[i * 3] = (Math.random() - 0.5) * 40;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 40;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
-
-    // Warna partikel: mix antara cyan dan putih
-    const isCyan = Math.random() > 0.6;
-    colors[i * 3] = isCyan ? 0.22 : 0.6;
-    colors[i * 3 + 1] = isCyan ? 0.74 : 0.65;
-    colors[i * 3 + 2] = isCyan ? 0.97 : 0.75;
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: 0.04,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.6,
-    sizeAttenuation: true,      // Partikel lebih kecil saat jauh
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-
-  particles = new THREE.Points(geo, mat);
-  scene.add(particles);
-}
-
-/**
- * Update visual ring orbit berdasarkan data akun.
- * 
- * Setiap akun direpresentasikan sebagai sebuah ring orbit
- * yang mengelilingi globe dengan warna sesuai status.
- * 
- * Ring disusun pada sudut (tilt) yang berbeda-beda agar
- * tidak saling tumpang tindih.
- * 
- * @param {Array} accounts - Daftar akun dari accounts.js
- */
-export function updateAccountVisuals(accounts) {
-  // Hapus semua ring lama
-  while (ringGroup.children.length > 0) {
-    const child = ringGroup.children[0];
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) child.material.dispose();
-    ringGroup.remove(child);
-  }
-
-  if (!accounts || accounts.length === 0) return;
-
-  const baseRadius = 2.8;
-
-  accounts.forEach((account, index) => {
-    const color = account.status === 'available' ? COLORS.available : COLORS.limited;
-    
-    // --- Ring orbit ---
-    // Setiap ring di-offset radius sedikit dan tilt berbeda
-    const ringRadius = baseRadius + index * 0.25;
-    const segments = 128;
-    const ringPoints = [];
-
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i / segments) * Math.PI * 2;
-      ringPoints.push(
-        new THREE.Vector3(
-          Math.cos(angle) * ringRadius,
-          0,
-          Math.sin(angle) * ringRadius
-        )
-      );
-    }
-
-    const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints);
-    const ringMat = new THREE.LineBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.6,
-    });
-    const ring = new THREE.Line(ringGeo, ringMat);
-
-    // Tilt ring di sudut berbeda supaya tidak overlap
-    // Setiap ring diputar di sumbu X dan Z
-    const tiltX = (index * 35 + 15) * (Math.PI / 180);
-    const tiltZ = (index * 25) * (Math.PI / 180);
-    ring.rotation.x = tiltX;
-    ring.rotation.z = tiltZ;
-
-    ringGroup.add(ring);
-
-    // --- Glowing point di ring (penanda posisi) ---
-    const pointGeo = new THREE.SphereGeometry(0.06, 16, 16);
-    const pointMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.9,
-    });
-    const point = new THREE.Mesh(pointGeo, pointMat);
-
-    // Posisi awal di ring
-    point.position.set(ringRadius, 0, 0);
-    // Simpan metadata untuk animasi
-    point.userData = {
-      ringRadius,
-      speed: 0.3 + index * 0.15,
-      offset: index * 1.5,
-    };
-    ring.add(point);
-
-    // --- Glow di sekitar point ---
-    const glowPointGeo = new THREE.SphereGeometry(0.15, 16, 16);
-    const glowPointMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.2,
-      blending: THREE.AdditiveBlending,
-    });
-    const glowPoint = new THREE.Mesh(glowPointGeo, glowPointMat);
-    glowPoint.position.copy(point.position);
-    glowPoint.userData = point.userData;
-    ring.add(glowPoint);
-  });
-}
-
-/**
- * Animation Loop.
- * 
- * requestAnimationFrame: browser memanggil fungsi ini ~60x/detik (60fps).
- * Di setiap frame:
- * 1. Update controls (damping)
- * 2. Rotate globe dan partikel
- * 3. Animate ring points (penanda bergerak di orbit)
- * 4. Re-render scene
- */
-function animate() {
-  animationId = requestAnimationFrame(animate);
-
-  const time = Date.now() * 0.001; // Waktu dalam detik
-
-  // Update controls (damping effect)
-  controls.update();
-
-  // Rotate globe perlahan
-  if (globe) {
-    globe.rotation.y += 0.001;
-  }
-  if (innerGlobe) {
-    innerGlobe.rotation.y += 0.001;
-  }
-
-  // Partikel bergerak perlahan
-  if (particles) {
-    particles.rotation.y += 0.0002;
-    particles.rotation.x += 0.0001;
-  }
-
-  // Animate ring points (penanda bergerak di orbit)
-  if (ringGroup) {
-    ringGroup.children.forEach((ring) => {
-      ring.children.forEach((child) => {
-        if (child.userData && child.userData.ringRadius) {
-          const { ringRadius, speed, offset } = child.userData;
-          const angle = time * speed + offset;
-          child.position.x = Math.cos(angle) * ringRadius;
-          child.position.z = Math.sin(angle) * ringRadius;
-        }
-      });
-    });
-  }
-
-  // Update glow shader
-  if (glowMesh && glowMesh.material.uniforms) {
-    glowMesh.material.uniforms.viewVector.value = camera.position;
-  }
-
-  renderer.render(scene, camera);
-}
-
-/**
- * Handle window resize.
- * Update camera aspect ratio dan renderer size.
- */
 function onResize() {
   const width = getWidth();
   const height = window.innerHeight;
-
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-
   renderer.setSize(width, height);
 }
