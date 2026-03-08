@@ -1,21 +1,34 @@
 /**
- * accounts.js — Account Data Management Module
+ * accounts.js — Account Data Management Module (Supabase)
  * 
- * Mengelola data akun di localStorage.
- * Menyediakan CRUD operations dan event system untuk notify komponen lain.
+ * Mengelola data akun menggunakan Supabase PostgreSQL database.
+ * Menyediakan async CRUD operations dan event system untuk notify komponen lain.
  * 
- * Data Model per akun:
+ * Menggunakan local cache agar UI tetap responsive:
+ * - Data di-fetch dari Supabase saat init (fetchAccounts)
+ * - Setiap mutasi (add/edit/delete) langsung update ke Supabase DAN local cache
+ * - Stats dihitung dari local cache (sync, instant)
+ * 
+ * Data Model (Supabase table "accounts"):
  * {
- *   id: string (UUID),
- *   name: string,
+ *   id: UUID (auto-generated),
+ *   name: text,
  *   status: "available" | "limited",
- *   refreshDays: number | null,     // sisa hari sampai refresh
- *   refreshHours: number | null,    // sisa jam sampai refresh
- *   createdAt: string (ISO datetime)
+ *   refresh_days: integer | null,
+ *   refresh_hours: integer | null,
+ *   created_at: timestamptz (auto-generated)
  * }
+ * 
+ * Note: Supabase column names pakai snake_case, tapi di JS kita convert ke camelCase.
  */
 
-const STORAGE_KEY = 'antigravity-accounts';
+import { supabase } from './supabase.js';
+
+/**
+ * Local cache — mirror data dari Supabase agar getStats() tetap synchronous.
+ * Di-update setiap kali ada mutasi atau fetch.
+ */
+let cachedAccounts = [];
 
 /** 
  * Listeners yang akan dipanggil setiap kali data berubah.
@@ -24,118 +37,156 @@ const STORAGE_KEY = 'antigravity-accounts';
 const listeners = [];
 
 /**
- * Generate UUID v4 sederhana.
- * Digunakan untuk memberikan ID unik ke setiap akun baru.
+ * Convert row dari Supabase (snake_case) ke format JS (camelCase).
+ * Ini penting karena PostgreSQL convention pakai underscore,
+ * tapi JavaScript convention pakai camelCase.
+ * 
+ * @param {Object} row - Row dari Supabase
+ * @returns {Object} Account object dalam format JS
  */
-function generateId() {
-  return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+function fromDb(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    refreshDays: row.refresh_days,
+    refreshHours: row.refresh_hours,
+    createdAt: row.created_at,
+  };
 }
 
 /**
- * Baca semua akun dari localStorage.
- * Jika belum ada data, return array kosong.
- * @returns {Array} Daftar akun
+ * Convert dari format JS (camelCase) ke Supabase (snake_case).
+ * Hanya convert field yang ada (partial update support).
+ * 
+ * @param {Object} data - Account data dalam format JS
+ * @returns {Object} Data dalam format Supabase
+ */
+function toDb(data) {
+  const row = {};
+  if (data.name !== undefined) row.name = data.name;
+  if (data.status !== undefined) row.status = data.status;
+  if (data.refreshDays !== undefined) row.refresh_days = data.refreshDays;
+  if (data.refreshHours !== undefined) row.refresh_hours = data.refreshHours;
+  return row;
+}
+
+/**
+ * Fetch semua akun dari Supabase.
+ * Dipanggil saat app init untuk populate local cache.
+ * 
+ * @returns {Promise<Array>} Daftar akun
+ */
+export async function fetchAccounts() {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('❌ Supabase fetch error:', error.message);
+    return cachedAccounts; // Return cache jika gagal
+  }
+
+  cachedAccounts = data.map(fromDb);
+  return cachedAccounts;
+}
+
+/**
+ * Get cached accounts (synchronous).
+ * Dipakai untuk getStats() dan rendering yang butuh data instant.
+ * 
+ * @returns {Array} Daftar akun dari cache
  */
 export function getAccounts() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error('Failed to read accounts from localStorage:', e);
-    return [];
-  }
+  return cachedAccounts;
 }
 
 /**
- * Simpan array akun ke localStorage.
- * Setelah simpan, notify semua listener bahwa data berubah.
- * @param {Array} accounts - Daftar akun yang akan disimpan
- */
-function saveAccounts(accounts) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
-    notifyListeners(accounts);
-  } catch (e) {
-    console.error('Failed to save accounts to localStorage:', e);
-  }
-}
-
-/**
- * Tambah akun baru.
+ * Tambah akun baru ke Supabase.
+ * 
  * @param {Object} data - { name, status, refreshDays, refreshHours }
- * @returns {Object} Akun yang baru dibuat (dengan id dan createdAt)
+ * @returns {Promise<Object|null>} Akun yang baru dibuat
  */
-export function addAccount({ name, status, refreshDays, refreshHours }) {
-  const accounts = getAccounts();
-  const newAccount = {
-    id: generateId(),
-    name,
-    status: status || 'available',
-    refreshDays: refreshDays ?? null,
-    refreshHours: refreshHours ?? null,
-    createdAt: new Date().toISOString(),
-  };
-  accounts.push(newAccount);
-  saveAccounts(accounts);
+export async function addAccount({ name, status, refreshDays, refreshHours }) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours }))
+    .select()   // Return inserted row
+    .single();  // Expect exactly 1 row
+
+  if (error) {
+    console.error('❌ Supabase insert error:', error.message);
+    return null;
+  }
+
+  const newAccount = fromDb(data);
+  cachedAccounts.push(newAccount);
+  notifyListeners(cachedAccounts);
   return newAccount;
 }
 
 /**
  * Edit akun yang sudah ada berdasarkan ID.
- * @param {string} id - ID akun yang akan diedit
- * @param {Object} updates - Field yang akan diupdate { name?, status?, limitTime? }
- * @returns {Object|null} Akun yang sudah diupdate, atau null jika tidak ditemukan
+ * 
+ * @param {string} id - UUID akun
+ * @param {Object} updates - { name?, status?, refreshDays?, refreshHours? }
+ * @returns {Promise<Object|null>} Akun yang sudah diupdate
  */
-export function editAccount(id, updates) {
-  const accounts = getAccounts();
-  const index = accounts.findIndex((a) => a.id === id);
-  if (index === -1) return null;
+export async function editAccount(id, updates) {
+  const { data, error } = await supabase
+    .from('accounts')
+    .update(toDb(updates))
+    .eq('id', id)
+    .select()
+    .single();
 
-  accounts[index] = { ...accounts[index], ...updates };
-  saveAccounts(accounts);
-  return accounts[index];
+  if (error) {
+    console.error('❌ Supabase update error:', error.message);
+    return null;
+  }
+
+  // Update local cache
+  const updated = fromDb(data);
+  const index = cachedAccounts.findIndex((a) => a.id === id);
+  if (index !== -1) cachedAccounts[index] = updated;
+  notifyListeners(cachedAccounts);
+  return updated;
 }
 
 /**
  * Hapus akun berdasarkan ID.
- * @param {string} id - ID akun yang akan dihapus
- * @returns {boolean} true jika berhasil dihapus
+ * 
+ * @param {string} id - UUID akun
+ * @returns {Promise<boolean>} true jika berhasil dihapus
  */
-export function removeAccount(id) {
-  let accounts = getAccounts();
-  const lengthBefore = accounts.length;
-  accounts = accounts.filter((a) => a.id !== id);
+export async function removeAccount(id) {
+  const { error } = await supabase
+    .from('accounts')
+    .delete()
+    .eq('id', id);
 
-  if (accounts.length < lengthBefore) {
-    saveAccounts(accounts);
-    return true;
+  if (error) {
+    console.error('❌ Supabase delete error:', error.message);
+    return false;
   }
-  return false;
+
+  // Update local cache
+  cachedAccounts = cachedAccounts.filter((a) => a.id !== id);
+  notifyListeners(cachedAccounts);
+  return true;
 }
 
 /**
- * Cari satu akun berdasarkan ID.
- * @param {string} id 
- * @returns {Object|undefined}
- */
-export function getAccountById(id) {
-  return getAccounts().find((a) => a.id === id);
-}
-
-/**
- * Hitung statistik ringkasan.
+ * Hitung statistik ringkasan dari local cache (synchronous).
+ * 
  * @returns {{ total: number, available: number, limited: number }}
  */
 export function getStats() {
-  const accounts = getAccounts();
   return {
-    total: accounts.length,
-    available: accounts.filter((a) => a.status === 'available').length,
-    limited: accounts.filter((a) => a.status === 'limited').length,
+    total: cachedAccounts.length,
+    available: cachedAccounts.filter((a) => a.status === 'available').length,
+    limited: cachedAccounts.filter((a) => a.status === 'limited').length,
   };
 }
 

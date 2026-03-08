@@ -10,6 +10,7 @@
  */
 
 import {
+  fetchAccounts,
   getAccounts,
   addAccount,
   editAccount,
@@ -42,7 +43,7 @@ let pendingDeleteId = null;
  * 
  * @param {Function} updateGlobeVisuals - Callback yang dipanggil saat data berubah
  */
-export function initUI(updateGlobeVisuals) {
+export async function initUI(updateGlobeVisuals) {
   onDataChange = updateGlobeVisuals;
 
   // Ambil referensi ke DOM elements
@@ -101,8 +102,16 @@ export function initUI(updateGlobeVisuals) {
     if (onDataChange) onDataChange(accounts);
   });
 
-  // Render awal
-  const accounts = getAccounts();
+  // Render loading state, lalu fetch dari Supabase
+  renderStats();
+  accountListEl.innerHTML = `
+    <div class="empty-state">
+      <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent-cyan)">// loading accounts from database...</p>
+    </div>
+  `;
+
+  // Fetch data dari Supabase
+  const accounts = await fetchAccounts();
   renderAccountList(accounts);
   renderStats();
   if (onDataChange) onDataChange(accounts);
@@ -289,7 +298,7 @@ function closeModal() {
  * - Ada → Edit mode, panggil editAccount()
  * - Kosong → Add mode, panggil addAccount()
  */
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault(); // Cegah form reload halaman
 
   const name = inputName.value.trim();
@@ -300,15 +309,15 @@ function handleFormSubmit(e) {
 
   if (!name) return;
 
+  closeModal();
+
   if (id) {
     // Edit existing account
-    editAccount(id, { name, status, refreshDays, refreshHours });
+    await editAccount(id, { name, status, refreshDays, refreshHours });
   } else {
     // Add new account
-    addAccount({ name, status, refreshDays, refreshHours });
+    await addAccount({ name, status, refreshDays, refreshHours });
   }
-
-  closeModal();
 }
 
 /**
@@ -340,9 +349,9 @@ function closeConfirm() {
 /**
  * Handle klik tombol "Delete" di confirm dialog.
  */
-function handleConfirmDelete() {
+async function handleConfirmDelete() {
   if (pendingDeleteId) {
-    removeAccount(pendingDeleteId);
+    await removeAccount(pendingDeleteId);
   }
   closeConfirm();
 }
