@@ -59,6 +59,15 @@ export async function initUI(updateGlobeVisuals) {
   inputHours = document.getElementById('input-hours');
   inputId = document.getElementById('input-id');
 
+  // Fix scroll: Stop wheel event dari ditelan oleh Three.js OrbitControls
+  // OrbitControls pakai wheel event untuk zoom, dan dia call preventDefault()
+  // yang mem-block scroll pada panel di atasnya. Solusi: stop propagation
+  // agar event wheel yang terjadi di panel tidak sampai ke canvas.
+  const sidePanel = document.getElementById('side-panel');
+  sidePanel.addEventListener('wheel', (e) => {
+    e.stopPropagation();
+  }, { passive: true });
+
   // --- Event Listeners ---
 
   // Tombol "Add" di panel header
