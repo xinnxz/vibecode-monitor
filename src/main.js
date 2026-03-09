@@ -15,13 +15,13 @@
 import './style.css';
 import { initGlobe } from './globe.js';
 import { initUI } from './ui.js';
-import { requestPermission } from './notifications.js';
+import { requestPermission, initNotifications } from './notifications.js';
 
 // --- Inisialisasi Aplikasi ---
 async function boot() {
-  // 1. Request notification permission
-  //    Minta izin browser untuk kirim notifikasi saat akun ready
+  // 1. Request notification permission + init notification center
   requestPermission();
+  initNotifications();
 
   // 2. Init Three.js Globe
   //    Container: div#canvas-container di index.html

@@ -1005,84 +1005,162 @@ html, body {
   50% { opacity: 0.7; text-shadow: 0 0 20px rgba(52, 211, 153, 0.8); }
 }
 
-/* ---------- Toast Notifications ---------- */
-#toast-container {
-  position: fixed;
-  bottom: 24px;
-  right: calc(var(--panel-width) + 24px);
-  z-index: 200;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.toast {
+/* ---------- Notification Center ---------- */
+.panel-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  min-width: 300px;
-  max-width: 420px;
-  background: rgba(10, 14, 23, 0.9);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(52, 211, 153, 0.3);
-  border-radius: 3px;
+  gap: 8px;
+}
+
+.notif-bell {
+  position: relative;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+
+.notif-bell:hover {
+  color: var(--accent-cyan);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent-red);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.notif-badge.hidden {
+  display: none;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.notif-panel {
+  position: absolute;
+  top: 64px;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(8, 12, 20, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: notif-slide-down 0.2s ease;
+}
+
+.notif-panel.hidden {
+  display: none;
+}
+
+@keyframes notif-slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notif-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.notif-panel-header .btn-icon {
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+}
+
+.notif-list {
+  padding: 4px 0;
+}
+
+.notif-empty {
+  padding: 20px 16px;
+  text-align: center;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  color: var(--text-primary);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 16px rgba(52, 211, 153, 0.1);
-  animation: toast-in 0.4s ease;
-  pointer-events: auto;
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
-.toast-success {
-  border-color: rgba(52, 211, 153, 0.3);
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background var(--transition-fast);
 }
 
-.toast-warning {
-  border-color: rgba(251, 191, 36, 0.3);
+.notif-item:hover {
+  background: rgba(56, 189, 248, 0.04);
 }
 
-.toast-info {
-  border-color: rgba(56, 189, 248, 0.3);
+.notif-item:last-child {
+  border-bottom: none;
 }
 
-.toast-icon {
-  font-size: 16px;
+.notif-item.unread {
+  background: rgba(52, 211, 153, 0.04);
+}
+
+.notif-dot {
+  color: var(--accent-green);
+  font-size: 8px;
+  line-height: 18px;
   flex-shrink: 0;
 }
 
-.toast-message {
+.notif-content {
   flex: 1;
-  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.notif-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-.toast-exit {
-  animation: toast-out 0.4s ease forwards;
+.notif-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
-@keyframes toast-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(40px);
-  }
+.notif-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
+
 
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {

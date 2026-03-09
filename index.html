@@ -41,13 +41,37 @@
     <aside id="side-panel" class="panel">
       <div class="panel-header">
         <h2>Accounts</h2>
-        <button id="btn-add-account" class="btn-primary" title="Add Account">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add
-        </button>
+        <div class="panel-header-actions">
+          <button id="btn-notifications" class="btn-icon notif-bell" title="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span id="notif-badge" class="notif-badge hidden">0</span>
+          </button>
+          <button id="btn-add-account" class="btn-primary" title="Add Account">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add
+          </button>
+        </div>
+      </div>
+      <!-- Notification Dropdown -->
+      <div id="notif-panel" class="notif-panel hidden">
+        <div class="notif-panel-header">
+          <span>// notifications</span>
+          <button id="btn-clear-notifs" class="btn-icon" title="Clear All">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
+        <div id="notif-list" class="notif-list">
+          <p class="notif-empty">// no notifications</p>
+        </div>
       </div>
       <div class="panel-filters">
         <button class="filter-btn active" data-filter="all">ALL</button>
@@ -130,8 +154,6 @@
       </div>
     </div>
 
-    <!-- Toast Notifications -->
-    <div id="toast-container"></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

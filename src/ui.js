@@ -22,7 +22,7 @@ import {
   onChange,
 } from './accounts.js';
 
-import { sendNotification, showToast } from './notifications.js';
+import { sendNotification } from './notifications.js';
 
 // --- DOM Elements ---
 let accountListEl,
@@ -475,8 +475,8 @@ function updateCountdowns() {
           const nameEl = card.querySelector('.card-name');
           const accountName = nameEl?.textContent?.trim() || 'Unknown';
 
+          // Kirim notification (browser + notification center)
           sendNotification(accountName);
-          showToast(`🟢 "${accountName}" is ready! Quota has been refreshed.`, 'success');
         }
       }
       return;
