@@ -7,8 +7,9 @@
  * 3. Handle modal form (add/edit akun)
  * 4. Handle confirm dialog (delete akun)
  * 5. Filter akun (All / Active / Limited)
- * 6. Live countdown timer (update setiap detik)
+ * 6. Live countdown timer (update via requestAnimationFrame)
  * 7. Notifikasi saat akun ready
+ * 8. Drag-to-reorder cards
  */
 
 import {
@@ -34,6 +35,7 @@ let accountListEl,
   inputStatus,
   inputDays,
   inputHours,
+  inputMinutes,
   inputId;
 
 // Fungsi callback untuk update globe visuals
@@ -48,8 +50,12 @@ let currentFilter = 'all';
 // Set untuk track akun yang sudah pernah di-notify (cegah duplikat)
 const notifiedIds = new Set();
 
-// Interval ID untuk countdown timer
-let countdownInterval = null;
+// RAF ID untuk countdown timer
+let countdownRAF = null;
+let lastCountdownUpdate = 0;
+
+// Drag state
+let draggedCardId = null;
 
 /**
  * Inisialisasi UI.
@@ -70,13 +76,25 @@ export async function initUI(updateGlobeVisuals) {
   inputStatus = document.getElementById('input-status');
   inputDays = document.getElementById('input-days');
   inputHours = document.getElementById('input-hours');
+  inputMinutes = document.getElementById('input-minutes');
   inputId = document.getElementById('input-id');
 
-  // Fix scroll: Stop wheel event dari ditelan oleh Three.js OrbitControls
+  // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
+  // OrbitControls memasang wheel listener di renderer.domElement;
+  // kita stop propagation agar wheel di panel tidak bocor ke canvas.
+  // Harus non-passive agar bisa preventDefault jika diperlukan.
   const sidePanel = document.getElementById('side-panel');
   sidePanel.addEventListener('wheel', (e) => {
     e.stopPropagation();
   }, { passive: true });
+
+  // Juga block pointer events saat di atas panel agar tidak mempengaruhi globe
+  sidePanel.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+  });
+  sidePanel.addEventListener('pointermove', (e) => {
+    e.stopPropagation();
+  });
 
   // --- Event Listeners ---
 
@@ -117,11 +135,8 @@ export async function initUI(updateGlobeVisuals) {
   // --- Filter Buttons ---
   document.querySelectorAll('.filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      // Update active state
       document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-
-      // Set filter dan re-render
       currentFilter = btn.dataset.filter;
       renderAccountList(getAccounts());
     });
@@ -148,8 +163,8 @@ export async function initUI(updateGlobeVisuals) {
   renderStats();
   if (onDataChange) onDataChange(accounts);
 
-  // Start countdown timer — update setiap 1 detik
-  startCountdownTimer();
+  // Start countdown timer via RAF (lebih smooth dari setInterval)
+  startCountdownRAF();
 }
 
 /**
@@ -226,9 +241,12 @@ function renderAccountList(accounts) {
         const countdownHtml = renderCountdown(account);
 
         return `
-    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.08}s" data-account-id="${account.id}">
-      <!-- Terminal-style header bar -->
-      <div class="card-header-bar">
+    <div class="account-card status-${account.status}" 
+         style="animation-delay: ${index * 0.08}s" 
+         data-account-id="${account.id}"
+         draggable="true">
+      <!-- Terminal-style header bar (drag handle) -->
+      <div class="card-header-bar card-drag-handle">
         <div class="card-header-left">
           <span class="card-status-indicator"></span>
           <span>${statusLabel}</span>
@@ -275,15 +293,96 @@ function renderAccountList(accounts) {
     )
     .join('');
 
-  // Event delegation: satu listener di parent untuk semua button di cards
+  // Event delegation untuk button actions
+  // Hapus listener lama, tambah baru (avoid stacking)
+  accountListEl.removeEventListener('click', handleCardAction);
   accountListEl.addEventListener('click', handleCardAction);
+
+  // Setup drag-to-reorder
+  setupDragAndDrop();
 }
+
+// ============================================================
+// DRAG & DROP — Reorder cards
+// ============================================================
+
+/**
+ * Setup drag & drop events pada semua account cards.
+ * User bisa hold dan drag card untuk memindahkan posisinya.
+ */
+function setupDragAndDrop() {
+  const cards = accountListEl.querySelectorAll('.account-card[draggable]');
+
+  cards.forEach((card) => {
+    card.addEventListener('dragstart', (e) => {
+      draggedCardId = card.dataset.accountId;
+      card.classList.add('dragging');
+      // Delay agar tampilan drag ghost terlihat bagus
+      setTimeout(() => card.style.opacity = '0.4', 0);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      card.style.opacity = '';
+      draggedCardId = null;
+
+      // Remove all drop indicators
+      accountListEl.querySelectorAll('.drag-over').forEach((el) => {
+        el.classList.remove('drag-over');
+      });
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      // Visual indicator: glow pada card yang di-hover
+      const dragging = accountListEl.querySelector('.dragging');
+      if (dragging && card !== dragging) {
+        // Remove indicator dari semua card lain
+        accountListEl.querySelectorAll('.drag-over').forEach((el) => {
+          el.classList.remove('drag-over');
+        });
+        card.classList.add('drag-over');
+      }
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over');
+    });
+
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+
+      const dragging = accountListEl.querySelector('.dragging');
+      if (!dragging || dragging === card) return;
+
+      // Tentukan posisi drop: sebelum atau sesudah target card
+      const rect = card.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      const insertBefore = e.clientY < midY;
+
+      if (insertBefore) {
+        accountListEl.insertBefore(dragging, card);
+      } else {
+        accountListEl.insertBefore(dragging, card.nextSibling);
+      }
+
+      // Reset styles
+      dragging.classList.remove('dragging');
+      dragging.style.opacity = '';
+    });
+  });
+}
+
+// ============================================================
+// COUNTDOWN TIMER (via requestAnimationFrame)
+// ============================================================
 
 /**
  * Render countdown string dari deadline.
- * 
- * Menghitung selisih antara deadline dan waktu sekarang,
- * lalu format ke "Xd Xh Xm Xs" atau "READY ✓" jika sudah lewat.
  * 
  * @param {Object} account - Account object
  * @returns {string} HTML string untuk countdown display
@@ -304,6 +403,15 @@ function renderCountdown(account) {
     return '<span class="countdown-ready">READY ✓</span>';
   }
 
+  return formatCountdown(diff);
+}
+
+/**
+ * Format milliseconds diff ke countdown string.
+ * @param {number} diff - Selisih ms
+ * @returns {string} HTML
+ */
+function formatCountdown(diff) {
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
@@ -319,61 +427,69 @@ function renderCountdown(account) {
 }
 
 /**
- * Start interval yang update semua countdown setiap 1 detik.
- * Juga cek apakah ada countdown yang baru saja expired → trigger notifikasi.
+ * Start countdown update loop via requestAnimationFrame.
+ * Lebih efisien dari setInterval karena:
+ * - Otomatis pause saat tab tidak visible
+ * - Synced dengan browser repaint cycle
+ * - Hanya update setiap 1 detik (throttled)
  */
-function startCountdownTimer() {
-  if (countdownInterval) clearInterval(countdownInterval);
-
-  countdownInterval = setInterval(() => {
-    const countdownEls = document.querySelectorAll('.countdown-value[data-deadline]');
-    
-    countdownEls.forEach((el) => {
-      const deadline = el.dataset.deadline;
-      if (!deadline) return;
-
-      const now = Date.now();
-      const target = new Date(deadline).getTime();
-      const diff = target - now;
-
-      if (diff <= 0) {
-        // Countdown expired!
-        if (el.innerHTML !== '<span class="countdown-ready">READY ✓</span>') {
-          el.innerHTML = '<span class="countdown-ready">READY ✓</span>';
-
-          // Cari nama akun untuk notifikasi
-          const card = el.closest('.account-card');
-          const accountId = card?.dataset.accountId;
-
-          if (accountId && !notifiedIds.has(accountId)) {
-            notifiedIds.add(accountId);
-            const nameEl = card.querySelector('.card-name');
-            const accountName = nameEl?.textContent?.trim() || 'Unknown';
-
-            // Kirim browser notification + toast
-            sendNotification(accountName);
-            showToast(`🟢 "${accountName}" is ready! Quota has been refreshed.`, 'success');
-          }
-        }
-        return;
-      }
-
-      // Hitung countdown
-      const days = Math.floor(diff / 86400000);
-      const hours = Math.floor((diff % 86400000) / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-
-      const parts = [];
-      if (days > 0) parts.push(`<span class="cd-num">${days}</span><span class="cd-unit">d</span>`);
-      if (hours > 0 || days > 0) parts.push(`<span class="cd-num">${String(hours).padStart(2, '0')}</span><span class="cd-unit">h</span>`);
-      parts.push(`<span class="cd-num">${String(minutes).padStart(2, '0')}</span><span class="cd-unit">m</span>`);
-      parts.push(`<span class="cd-num">${String(seconds).padStart(2, '0')}</span><span class="cd-unit">s</span>`);
-
-      el.innerHTML = parts.join(' ');
-    });
-  }, 1000);
+function startCountdownRAF() {
+  function tick(timestamp) {
+    // Throttle: hanya update setiap ~1000ms
+    if (timestamp - lastCountdownUpdate >= 1000) {
+      lastCountdownUpdate = timestamp;
+      updateCountdowns();
+    }
+    countdownRAF = requestAnimationFrame(tick);
+  }
+  countdownRAF = requestAnimationFrame(tick);
 }
+
+/**
+ * Update semua countdown displays di DOM.
+ * Menggunakan textContent/innerHTML minimal untuk mengurangi reflow.
+ */
+function updateCountdowns() {
+  const countdownEls = document.querySelectorAll('.countdown-value[data-deadline]');
+
+  countdownEls.forEach((el) => {
+    const deadline = el.dataset.deadline;
+    if (!deadline) return;
+
+    const now = Date.now();
+    const target = new Date(deadline).getTime();
+    const diff = target - now;
+
+    if (diff <= 0) {
+      // Countdown expired!
+      const readyHtml = '<span class="countdown-ready">READY ✓</span>';
+      if (el.innerHTML !== readyHtml) {
+        el.innerHTML = readyHtml;
+
+        // Trigger notifikasi
+        const card = el.closest('.account-card');
+        const accountId = card?.dataset.accountId;
+
+        if (accountId && !notifiedIds.has(accountId)) {
+          notifiedIds.add(accountId);
+          const nameEl = card.querySelector('.card-name');
+          const accountName = nameEl?.textContent?.trim() || 'Unknown';
+
+          sendNotification(accountName);
+          showToast(`🟢 "${accountName}" is ready! Quota has been refreshed.`, 'success');
+        }
+      }
+      return;
+    }
+
+    // Update countdown display
+    el.innerHTML = formatCountdown(diff);
+  });
+}
+
+// ============================================================
+// CARD ACTIONS, MODAL, CONFIRM
+// ============================================================
 
 /**
  * Handle klik pada tombol di dalam card akun.
@@ -394,8 +510,6 @@ function handleCardAction(e) {
 
 /**
  * Buka modal form.
- * 
- * @param {string|null} editId - Jika ada, modal dalam mode edit. Jika null, mode add.
  */
 function openModal(editId = null) {
   accountForm.reset();
@@ -411,6 +525,7 @@ function openModal(editId = null) {
     inputStatus.value = account.status;
     inputDays.value = account.refreshDays ?? '';
     inputHours.value = account.refreshHours ?? '';
+    inputMinutes.value = account.refreshMinutes ?? '';
     inputId.value = account.id;
   } else {
     modalTitle.textContent = '// new_account';
@@ -420,9 +535,6 @@ function openModal(editId = null) {
   setTimeout(() => inputName.focus(), 100);
 }
 
-/**
- * Tutup modal form.
- */
 function closeModal() {
   modalOverlay.classList.add('hidden');
   accountForm.reset();
@@ -430,6 +542,7 @@ function closeModal() {
 
 /**
  * Handle submit form (Add atau Edit).
+ * Sekarang include minutes.
  */
 async function handleFormSubmit(e) {
   e.preventDefault();
@@ -438,6 +551,7 @@ async function handleFormSubmit(e) {
   const status = inputStatus.value;
   const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
   const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
+  const refreshMinutes = inputMinutes.value !== '' ? parseInt(inputMinutes.value, 10) : null;
   const id = inputId.value;
 
   if (!name) return;
@@ -445,17 +559,13 @@ async function handleFormSubmit(e) {
   closeModal();
 
   if (id) {
-    // Edit — juga clear notified state karena timer mungkin di-reset
     notifiedIds.delete(id);
-    await editAccount(id, { name, status, refreshDays, refreshHours });
+    await editAccount(id, { name, status, refreshDays, refreshHours, refreshMinutes });
   } else {
-    await addAccount({ name, status, refreshDays, refreshHours });
+    await addAccount({ name, status, refreshDays, refreshHours, refreshMinutes });
   }
 }
 
-/**
- * Buka confirm dialog untuk delete.
- */
 function openConfirm(id) {
   pendingDeleteId = id;
 
@@ -469,17 +579,11 @@ function openConfirm(id) {
   confirmOverlay.classList.remove('hidden');
 }
 
-/**
- * Tutup confirm dialog.
- */
 function closeConfirm() {
   confirmOverlay.classList.add('hidden');
   pendingDeleteId = null;
 }
 
-/**
- * Handle klik tombol "Delete" di confirm dialog.
- */
 async function handleConfirmDelete() {
   if (pendingDeleteId) {
     notifiedIds.delete(pendingDeleteId);
@@ -488,14 +592,12 @@ async function handleConfirmDelete() {
   closeConfirm();
 }
 
+// ============================================================
+// HELPERS
+// ============================================================
+
 /**
  * Legacy format durasi untuk akun yang belum punya deadline.
- * Fallback: jika refresh_deadline belum ada di database,
- * tampilkan static "Xd Xh" dari refresh_days/refresh_hours.
- * 
- * @param {number|null} days
- * @param {number|null} hours
- * @returns {string}
  */
 function formatDurationLegacy(days, hours) {
   const d = days ?? 0;
@@ -507,12 +609,6 @@ function formatDurationLegacy(days, hours) {
   return parts.join(' ');
 }
 
-/**
- * Escape HTML untuk mencegah XSS.
- * 
- * @param {string} str
- * @returns {string}
- */
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;

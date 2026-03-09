@@ -51,6 +51,7 @@ function fromDb(row) {
     status: row.status,
     refreshDays: row.refresh_days,
     refreshHours: row.refresh_hours,
+    refreshMinutes: row.refresh_minutes ?? null,
     refreshDeadline: row.refresh_deadline ?? null,
     createdAt: row.created_at,
   };
@@ -60,8 +61,8 @@ function fromDb(row) {
  * Convert dari format JS (camelCase) ke Supabase (snake_case).
  * Hanya convert field yang ada (partial update support).
  * 
- * Jika refreshDays/refreshHours diberikan, otomatis hitung refresh_deadline.
- * refresh_deadline = now + (days * 86400000) + (hours * 3600000)
+ * Jika refreshDays/refreshHours/refreshMinutes diberikan, otomatis hitung refresh_deadline.
+ * refresh_deadline = now + (days * 86400000) + (hours * 3600000) + (minutes * 60000)
  * 
  * @param {Object} data - Account data dalam format JS
  * @returns {Object} Data dalam format Supabase
@@ -72,15 +73,16 @@ function toDb(data) {
   if (data.status !== undefined) row.status = data.status;
   if (data.refreshDays !== undefined) row.refresh_days = data.refreshDays;
   if (data.refreshHours !== undefined) row.refresh_hours = data.refreshHours;
+  if (data.refreshMinutes !== undefined) row.refresh_minutes = data.refreshMinutes;
 
-  // Hitung deadline dari days + hours jika tersedia
+  // Hitung deadline dari days + hours + minutes jika tersedia
   const days = data.refreshDays ?? 0;
   const hours = data.refreshHours ?? 0;
-  if (days > 0 || hours > 0) {
-    const ms = (days * 86400000) + (hours * 3600000);
+  const minutes = data.refreshMinutes ?? 0;
+  if (days > 0 || hours > 0 || minutes > 0) {
+    const ms = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
     row.refresh_deadline = new Date(Date.now() + ms).toISOString();
-  } else if (data.refreshDays !== undefined || data.refreshHours !== undefined) {
-    // Jika days dan hours keduanya 0 atau null, clear deadline
+  } else if (data.refreshDays !== undefined || data.refreshHours !== undefined || data.refreshMinutes !== undefined) {
     row.refresh_deadline = null;
   }
 
@@ -121,13 +123,13 @@ export function getAccounts() {
 /**
  * Tambah akun baru ke Supabase.
  * 
- * @param {Object} data - { name, status, refreshDays, refreshHours }
+ * @param {Object} data - { name, status, refreshDays, refreshHours, refreshMinutes }
  * @returns {Promise<Object|null>} Akun yang baru dibuat
  */
-export async function addAccount({ name, status, refreshDays, refreshHours }) {
+export async function addAccount({ name, status, refreshDays, refreshHours, refreshMinutes }) {
   const { data, error } = await supabase
     .from('accounts')
-    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours }))
+    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours, refreshMinutes }))
     .select()   // Return inserted row
     .single();  // Expect exactly 1 row
 

@@ -584,6 +584,26 @@ html, body {
 }
 
 
+/* ---------- Drag & Drop ---------- */
+.account-card[draggable] {
+  cursor: grab;
+}
+
+.account-card[draggable]:active {
+  cursor: grabbing;
+}
+
+.account-card.dragging {
+  opacity: 0.4 !important;
+  transform: scale(0.98);
+}
+
+.account-card.drag-over {
+  border-color: var(--accent-cyan) !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.05) !important;
+  transform: translateY(2px);
+  transition: all 0.15s ease;
+}
 
 
 /* ---------- Buttons ---------- */
