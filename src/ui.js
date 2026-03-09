@@ -54,8 +54,7 @@ const notifiedIds = new Set();
 let countdownRAF = null;
 let lastCountdownUpdate = 0;
 
-// Drag state
-let draggedCardId = null;
+// Drag state (managed by drag functions below)
 
 /**
  * Inisialisasi UI.
@@ -243,8 +242,7 @@ function renderAccountList(accounts) {
         return `
     <div class="account-card status-${account.status}" 
          style="animation-delay: ${index * 0.08}s" 
-         data-account-id="${account.id}"
-         draggable="true">
+         data-account-id="${account.id}">
       <!-- Terminal-style header bar (drag handle) -->
       <div class="card-header-bar card-drag-handle">
         <div class="card-header-left">
@@ -298,83 +296,246 @@ function renderAccountList(accounts) {
   accountListEl.removeEventListener('click', handleCardAction);
   accountListEl.addEventListener('click', handleCardAction);
 
-  // Setup drag-to-reorder
+  // Setup drag-to-reorder (custom pointer-based)
   setupDragAndDrop();
 }
 
 // ============================================================
-// DRAG & DROP — Reorder cards
+// DRAG & DROP — Custom Pointer-based Reorder
 // ============================================================
 
 /**
- * Setup drag & drop events pada semua account cards.
- * User bisa hold dan drag card untuk memindahkan posisinya.
+ * State untuk drag system.
+ * 
+ * Kenapa custom dan bukan HTML5 Drag API?
+ * HTML5 Drag API menghasilkan "ghost image" yang kaku dan tidak bisa
+ * di-style. Dengan custom pointer events, kita bisa:
+ * - Membuat card "terangkat" dan mengikuti cursor dengan smooth
+ * - Menggeser card lain dengan animasi transition
+ * - Full kontrol atas semua visual feedback
+ */
+let isDragging = false;
+let dragClone = null;          // Floating clone yang mengikuti cursor
+let dragSourceCard = null;     // Card asli yang sedang di-drag
+let dragStartY = 0;            // Posisi Y awal saat drag mulai
+let dragOffsetY = 0;           // Offset antara cursor dan top card
+let dragPlaceholderIdx = -1;   // Index target dimana card akan di-drop
+
+/**
+ * Setup drag event listeners pada account list.
+ * Menggunakan event delegation — satu listener di parent.
  */
 function setupDragAndDrop() {
-  const cards = accountListEl.querySelectorAll('.account-card[draggable]');
+  // Pasang di accountListEl (parent), bukan di setiap card
+  accountListEl.addEventListener('pointerdown', onDragStart);
+}
 
+/**
+ * Mulai drag saat user pointerdown pada card header.
+ * 
+ * Hanya mulai drag dari .card-drag-handle (header bar card).
+ * Ini mencegah drag saat klik tombol edit/delete.
+ */
+function onDragStart(e) {
+  // Hanya left-click / primary touch
+  if (e.button !== 0) return;
+
+  // Jangan drag jika klik pada button (edit/delete)  
+  if (e.target.closest('[data-action]')) return;
+
+  // Cari card dan pastikan klik di area drag handle
+  const card = e.target.closest('.account-card');
+  if (!card) return;
+
+  const handle = e.target.closest('.card-drag-handle');
+  if (!handle) return;
+
+  // Prevent text selection saat drag
+  e.preventDefault();
+
+  isDragging = true;
+  dragSourceCard = card;
+
+  const rect = card.getBoundingClientRect();
+  dragOffsetY = e.clientY - rect.top;
+  dragStartY = e.clientY;
+
+  // Buat floating clone
+  dragClone = card.cloneNode(true);
+  dragClone.classList.add('drag-clone');
+  dragClone.style.width = `${rect.width}px`;
+  dragClone.style.left = `${rect.left}px`;
+  dragClone.style.top = `${rect.top}px`;
+  document.body.appendChild(dragClone);
+
+  // Sembunyikan card asli (beri placeholder space)
+  card.classList.add('drag-source');
+
+  // Hitung posisi awal semua cards untuk animasi gap
+  cacheCardPositions();
+
+  // Pasang move dan up listener di document (agar track di luar element)
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragEnd);
+}
+
+/**
+ * Cache posisi Y setiap card untuk kalkulasi gap.
+ */
+let cardRects = [];
+
+function cacheCardPositions() {
+  const cards = Array.from(accountListEl.querySelectorAll('.account-card'));
+  cardRects = cards.map((card) => ({
+    el: card,
+    top: card.getBoundingClientRect().top,
+    height: card.getBoundingClientRect().height,
+    id: card.dataset.accountId,
+  }));
+}
+
+/**
+ * Handle pointer move saat dragging.
+ * - Update posisi floating clone
+ * - Hitung target index berdasarkan posisi cursor
+ * - Animasi cards lain untuk membuat gap
+ */
+function onDragMove(e) {
+  if (!isDragging || !dragClone) return;
+
+  // Update posisi clone (mengikuti cursor)
+  const newTop = e.clientY - dragOffsetY;
+  dragClone.style.top = `${newTop}px`;
+
+  // Hitung index target: di posisi mana card akan jatuh
+  const cursorY = e.clientY;
+  const cards = Array.from(accountListEl.querySelectorAll('.account-card'));
+  const sourceIdx = cards.indexOf(dragSourceCard);
+  let targetIdx = sourceIdx;
+
+  for (let i = 0; i < cards.length; i++) {
+    if (cards[i] === dragSourceCard) continue;
+    const rect = cards[i].getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+
+    if (cursorY > midY) {
+      targetIdx = i > sourceIdx ? i : i + 1;
+    } else if (i < sourceIdx && cursorY < midY) {
+      targetIdx = i;
+      break;
+    }
+  }
+
+  // Hanya update jika target berubah (hindari repaint berlebihan)
+  if (targetIdx !== dragPlaceholderIdx) {
+    dragPlaceholderIdx = targetIdx;
+    animateGap(cards, sourceIdx, targetIdx);
+  }
+}
+
+/**
+ * Animasi card-card lain untuk "membuka ruang" di posisi target.
+ * 
+ * Cara kerja:
+ * - Cards antara source dan target bergeser ke atas/bawah
+ * - Menggunakan CSS transform translateY dengan transition
+ * - Ini memberikan efek visual bahwa card lain "menyingkir"
+ * 
+ * @param {Element[]} cards - Semua card elements
+ * @param {number} fromIdx - Index card yang sedang di-drag
+ * @param {number} toIdx - Index target dimana card akan di-drop
+ */
+function animateGap(cards, fromIdx, toIdx) {
+  const sourceHeight = dragSourceCard.offsetHeight + 12; // +12 for margin
+
+  cards.forEach((card, i) => {
+    if (card === dragSourceCard) return;
+
+    let shift = 0;
+
+    if (fromIdx < toIdx) {
+      // Drag ke bawah: cards di antara from+1 dan to geser ke atas
+      if (i > fromIdx && i <= toIdx) {
+        shift = -sourceHeight;
+      }
+    } else if (fromIdx > toIdx) {
+      // Drag ke atas: cards di antara to dan from-1 geser ke bawah
+      if (i >= toIdx && i < fromIdx) {
+        shift = sourceHeight;
+      }
+    }
+
+    card.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+}
+
+/**
+ * Selesaikan drag — drop card di posisi target.
+ * 
+ * Langkah:
+ * 1. Hitung posisi final card di DOM
+ * 2. Animasi clone ke posisi akhir (smooth landing)
+ * 3. Pindahkan card asli di DOM
+ * 4. Cleanup semua state dan styles
+ */
+function onDragEnd() {
+  if (!isDragging) return;
+
+  // Hapus move/up listeners
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragEnd);
+
+  const cards = Array.from(accountListEl.querySelectorAll('.account-card'));
+  const fromIdx = cards.indexOf(dragSourceCard);
+  const toIdx = dragPlaceholderIdx;
+
+  // Reset transform semua cards
   cards.forEach((card) => {
-    card.addEventListener('dragstart', (e) => {
-      draggedCardId = card.dataset.accountId;
-      card.classList.add('dragging');
-      // Delay agar tampilan drag ghost terlihat bagus
-      setTimeout(() => card.style.opacity = '0.4', 0);
-      e.dataTransfer.effectAllowed = 'move';
-    });
+    card.style.transition = 'none';
+    card.style.transform = '';
+  });
 
-    card.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-      card.style.opacity = '';
-      draggedCardId = null;
+  // Pindahkan di DOM jika index berubah
+  if (toIdx !== -1 && toIdx !== fromIdx) {
+    const targetCard = cards[toIdx];
+    if (toIdx > fromIdx) {
+      accountListEl.insertBefore(dragSourceCard, targetCard?.nextSibling || null);
+    } else {
+      accountListEl.insertBefore(dragSourceCard, targetCard);
+    }
+  }
 
-      // Remove all drop indicators
-      accountListEl.querySelectorAll('.drag-over').forEach((el) => {
-        el.classList.remove('drag-over');
-      });
-    });
+  // Cleanup
+  dragSourceCard.classList.remove('drag-source');
 
-    card.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
+  // Animasi landing: clone menghilang
+  if (dragClone) {
+    const finalRect = dragSourceCard.getBoundingClientRect();
+    dragClone.style.transition = 'all 0.2s cubic-bezier(0.2, 0, 0, 1)';
+    dragClone.style.top = `${finalRect.top}px`;
+    dragClone.style.left = `${finalRect.left}px`;
+    dragClone.style.transform = 'scale(1)';
+    dragClone.style.boxShadow = 'none';
 
-      // Visual indicator: glow pada card yang di-hover
-      const dragging = accountListEl.querySelector('.dragging');
-      if (dragging && card !== dragging) {
-        // Remove indicator dari semua card lain
-        accountListEl.querySelectorAll('.drag-over').forEach((el) => {
-          el.classList.remove('drag-over');
-        });
-        card.classList.add('drag-over');
-      }
-    });
+    setTimeout(() => {
+      dragClone?.remove();
+      dragClone = null;
+    }, 200);
+  }
 
-    card.addEventListener('dragleave', () => {
-      card.classList.remove('drag-over');
-    });
-
-    card.addEventListener('drop', (e) => {
-      e.preventDefault();
-      card.classList.remove('drag-over');
-
-      const dragging = accountListEl.querySelector('.dragging');
-      if (!dragging || dragging === card) return;
-
-      // Tentukan posisi drop: sebelum atau sesudah target card
-      const rect = card.getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      const insertBefore = e.clientY < midY;
-
-      if (insertBefore) {
-        accountListEl.insertBefore(dragging, card);
-      } else {
-        accountListEl.insertBefore(dragging, card.nextSibling);
-      }
-
-      // Reset styles
-      dragging.classList.remove('dragging');
-      dragging.style.opacity = '';
+  // Re-enable transition untuk card lain
+  requestAnimationFrame(() => {
+    cards.forEach((card) => {
+      card.style.transition = '';
     });
   });
+
+  // Reset drag state
+  isDragging = false;
+  dragSourceCard = null;
+  dragPlaceholderIdx = -1;
+  dragStartY = 0;
+  cardRects = [];
 }
 
 // ============================================================

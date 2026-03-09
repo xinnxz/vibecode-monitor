@@ -584,25 +584,42 @@ html, body {
 }
 
 
-/* ---------- Drag & Drop ---------- */
-.account-card[draggable] {
+/* ---------- Custom Drag & Drop ---------- */
+
+/* Drag handle: header bar area, show grab cursor */
+.card-drag-handle {
   cursor: grab;
 }
 
-.account-card[draggable]:active {
+.card-drag-handle:active {
   cursor: grabbing;
 }
 
-.account-card.dragging {
-  opacity: 0.4 !important;
-  transform: scale(0.98);
+/* Source card: tetap di tempat tapi jadi placeholder transparan */
+.account-card.drag-source {
+  opacity: 0.2 !important;
+  border-style: dashed !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  background: rgba(56, 189, 248, 0.02) !important;
 }
 
-.account-card.drag-over {
-  border-color: var(--accent-cyan) !important;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.05) !important;
-  transform: translateY(2px);
-  transition: all 0.15s ease;
+/* Floating clone: card yang mengikuti cursor */
+.drag-clone {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: scale(1.03);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(56, 189, 248, 0.15),
+    0 0 0 1px rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-md);
+  opacity: 0.95;
+}
+
+/* Cards lain: smooth transition saat bergeser membuat gap */
+.account-card {
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
 }
 
 
