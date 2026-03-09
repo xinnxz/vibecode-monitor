@@ -29,7 +29,7 @@ import {
   flyArc,
   getCirclePoints,
   createAnimateLine,
-  INDONESIAN_CITIES,
+  WORLD_CITIES,
 } from './globe-utils.js';
 
 // ============================================================
@@ -75,6 +75,7 @@ let markupPointGroup;
 let labelSprites = [];
 let timeValue = 100;
 let textures = {};
+let isUserDragging = false; // Flag: true saat user hold/drag globe
 
 // Shader uniforms untuk scan line animation
 let uniforms;
@@ -146,6 +147,10 @@ export function initGlobe(container) {
   controls.maxDistance = 300;
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.5;
+
+  // Track drag state: stop earth rotation saat user hold/drag
+  controls.addEventListener('start', () => { isUserDragging = true; });
+  controls.addEventListener('end', () => { isUserDragging = false; });
 
   // --- Groups ---
   mainGroup = new THREE.Group();
@@ -433,7 +438,7 @@ function createSatelliteOrbits() {
 
 /**
  * Update visual elements berdasarkan data akun.
- * Setiap akun ditempatkan di kota Indonesia.
+ * Setiap akun ditempatkan di kota random di seluruh dunia.
  *
  * @param {Array} accounts - Daftar akun dari accounts.js
  */
@@ -462,10 +467,10 @@ export function updateAccountVisuals(accounts) {
   }
 
   const R = CONFIG.earth.radius;
-  const jakartaCity = INDONESIAN_CITIES[0]; // Jakarta as hub
+  const hubCity = WORLD_CITIES[0]; // New York as hub for fly arcs
 
   accounts.forEach((account, index) => {
-    const city = INDONESIAN_CITIES[index % INDONESIAN_CITIES.length];
+    const city = WORLD_CITIES[index % WORLD_CITIES.length];
     const isAvailable = account.status === 'available';
     const color = isAvailable
       ? CONFIG.punctuation.lightColumn.startColor
@@ -501,11 +506,11 @@ export function updateAccountVisuals(accounts) {
     markupPointGroup.add(wave);
     waveMeshArr.push(wave);
 
-    // --- Fly Arcs (from Jakarta to other cities) ---
+    // --- Fly Arcs (from hub to other cities) ---
     if (index > 0) {
       const arcline = flyArc(
         R,
-        jakartaCity.E, jakartaCity.N,
+        hubCity.E, hubCity.N,
         city.E, city.N,
         CONFIG.flyLine
       );
@@ -527,32 +532,61 @@ export function updateAccountVisuals(accounts) {
 /**
  * Buat label sprite (text) untuk ditampilkan di atas titik kota.
  * Menggunakan CanvasTexture — render text ke canvas lalu jadikan texture.
+ * Desain: dark background box + bright text + glow untuk kontras maksimal.
  *
  * @param {string} text - Nama account
  * @param {Object} city - { N, E } coordinates
  * @param {number} radius - Earth radius
  */
 function createLabelSprite(text, city, radius) {
-  // Create canvas for text rendering
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  canvas.width = 256;
-  canvas.height = 64;
+  canvas.width = 640;
+  canvas.height = 160;
 
-  // Draw text
-  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
 
-  ctx.font = 'bold 24px JetBrains Mono, monospace';
-  ctx.fillStyle = '#38bdf8';
+  // --- Dark background box with rounded corners ---
+  ctx.fillStyle = 'rgba(10, 14, 23, 0.9)';
+  const boxW = canvas.width - 40;
+  const boxH = 100;
+  const boxX = (canvas.width - boxW) / 2;
+  const boxY = (canvas.height - boxH) / 2;
+  const borderRadius = 16;
+
+  ctx.beginPath();
+  ctx.moveTo(boxX + borderRadius, boxY);
+  ctx.lineTo(boxX + boxW - borderRadius, boxY);
+  ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + borderRadius);
+  ctx.lineTo(boxX + boxW, boxY + boxH - borderRadius);
+  ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - borderRadius, boxY + boxH);
+  ctx.lineTo(boxX + borderRadius, boxY + boxH);
+  ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - borderRadius);
+  ctx.lineTo(boxX, boxY + borderRadius);
+  ctx.quadraticCurveTo(boxX, boxY, boxX + borderRadius, boxY);
+  ctx.closePath();
+  ctx.fill();
+
+  // --- Border glow ---
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // --- Sharp readable text ---
+  ctx.font = 'bold 48px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-  // Glow effect
-  ctx.shadowColor = '#0cd1eb';
-  ctx.shadowBlur = 8;
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  // Subtle dark shadow for depth (bukan glow terang yang bikin blur)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+
+  // Render text — warna terang, tajam, tanpa glow
+  ctx.fillStyle = '#e0f2fe';
+  ctx.fillText(text, centerX, centerY);
 
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.SpriteMaterial({
@@ -562,12 +596,12 @@ function createLabelSprite(text, city, radius) {
   });
   const sprite = new THREE.Sprite(material);
 
-  // Position above the city
-  const p = lon2xyz(radius * 1.15, city.E, city.N);
+  // Position above light pillar
+  const p = lon2xyz(radius * 1.35, city.E, city.N);
   sprite.position.set(p.x, p.y, p.z);
 
-  const len = 5 + Math.max(0, text.length - 3) * 1.5;
-  sprite.scale.set(len, 2, 1);
+  const len = 10 + Math.max(0, text.length - 3) * 2.2;
+  sprite.scale.set(len, 4, 1);
 
   return sprite;
 }
@@ -595,8 +629,8 @@ function animate() {
 
   controls.update();
 
-  // Rotate earth
-  if (CONFIG.earth.rotateSpeed && earthGroup) {
+  // Rotate earth (STOP saat user sedang drag/hold globe)
+  if (CONFIG.earth.rotateSpeed && earthGroup && !isUserDragging) {
     earthGroup.rotation.y += CONFIG.earth.rotateSpeed;
   }
 

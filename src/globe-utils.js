@@ -9,31 +9,41 @@
  * - Fly arc (garis terbang melengkung antar kota)
  * - Satellite orbit helpers
  * 
- * Koordinat kota-kota Indonesia untuk data points.
+ * Koordinat kota-kota dunia untuk data points.
  */
 
 import * as THREE from 'three';
 
 // ============================================================
-// INDONESIAN CITY COORDINATES
+// WORLDWIDE CITY COORDINATES
 // ============================================================
 
 /**
- * 10 kota besar di Indonesia.
- * Digunakan untuk menempatkan data points di globe.
- * Akun di-assign ke kota secara berurutan (modulo 10).
+ * 20 kota besar di seluruh dunia (tersebar di semua benua).
+ * Akun di-assign ke kota secara berurutan (modulo 20).
+ * Posisi tersebar agar globe terlihat hidup dari segala arah.
  */
-export const INDONESIAN_CITIES = [
-  { name: 'Jakarta',     N: -6.2088,  E: 106.8456 },
-  { name: 'Surabaya',    N: -7.2575,  E: 112.7521 },
-  { name: 'Bandung',     N: -6.9175,  E: 107.6191 },
-  { name: 'Medan',       N:  3.5952,  E:  98.6722 },
-  { name: 'Semarang',    N: -6.9666,  E: 110.4196 },
-  { name: 'Makassar',    N: -5.1477,  E: 119.4327 },
-  { name: 'Palembang',   N: -2.9761,  E: 104.7754 },
-  { name: 'Denpasar',    N: -8.6705,  E: 115.2126 },
-  { name: 'Yogyakarta',  N: -7.7956,  E: 110.3695 },
-  { name: 'Manado',      N:  1.4748,  E: 124.8421 },
+export const WORLD_CITIES = [
+  { name: 'New York',     N:  40.7128, E: -74.0060 },
+  { name: 'London',       N:  51.5074, E:  -0.1278 },
+  { name: 'Tokyo',        N:  35.6762, E: 139.6503 },
+  { name: 'Sydney',       N: -33.8688, E: 151.2093 },
+  { name: 'Dubai',        N:  25.2048, E:  55.2708 },
+  { name: 'Singapore',    N:   1.3521, E: 103.8198 },
+  { name: 'São Paulo',    N: -23.5505, E: -46.6333 },
+  { name: 'Moscow',       N:  55.7558, E:  37.6173 },
+  { name: 'Mumbai',       N:  19.0760, E:  72.8777 },
+  { name: 'Cape Town',    N: -33.9249, E:  18.4241 },
+  { name: 'Los Angeles',  N:  34.0522, E:-118.2437 },
+  { name: 'Paris',        N:  48.8566, E:   2.3522 },
+  { name: 'Seoul',        N:  37.5665, E: 126.9780 },
+  { name: 'Jakarta',      N:  -6.2088, E: 106.8456 },
+  { name: 'Cairo',        N:  30.0444, E:  31.2357 },
+  { name: 'Toronto',      N:  43.6532, E: -79.3832 },
+  { name: 'Berlin',       N:  52.5200, E:  13.4050 },
+  { name: 'Bangkok',      N:  13.7563, E: 100.5018 },
+  { name: 'Mexico City',  N:  19.4326, E: -99.1332 },
+  { name: 'Lagos',        N:   6.5244, E:   3.3792 },
 ];
 
 // ============================================================

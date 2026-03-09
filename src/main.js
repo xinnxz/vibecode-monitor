@@ -15,21 +15,26 @@
 import './style.css';
 import { initGlobe } from './globe.js';
 import { initUI } from './ui.js';
+import { requestPermission } from './notifications.js';
 
 // --- Inisialisasi Aplikasi ---
 async function boot() {
-  // 1. Init Three.js Globe
+  // 1. Request notification permission
+  //    Minta izin browser untuk kirim notifikasi saat akun ready
+  requestPermission();
+
+  // 2. Init Three.js Globe
   //    Container: div#canvas-container di index.html
   const container = document.getElementById('canvas-container');
   const globe = initGlobe(container);
 
-  // 2. Init UI (async karena fetch data dari Supabase)
+  // 3. Init UI
   //    Pass globe.updateVisuals sebagai callback agar UI bisa trigger update globe
   //    saat data akun berubah (add/edit/delete)
   await initUI(globe.updateVisuals);
 
   // Log untuk debugging
-  console.log('🌐 Vibe Code Monitor initialized (Supabase connected)');
+  console.log('🌐 Vibe Code Monitor initialized');
 }
 
 boot().catch((err) => {

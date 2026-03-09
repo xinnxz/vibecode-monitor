@@ -6,7 +6,9 @@
  * 2. Render stats bar (total/available/limited)
  * 3. Handle modal form (add/edit akun)
  * 4. Handle confirm dialog (delete akun)
- * 5. Menghubungkan event-event ke accounts module
+ * 5. Filter akun (All / Active / Limited)
+ * 6. Live countdown timer (update setiap detik)
+ * 7. Notifikasi saat akun ready
  */
 
 import {
@@ -18,6 +20,8 @@ import {
   getStats,
   onChange,
 } from './accounts.js';
+
+import { sendNotification, showToast } from './notifications.js';
 
 // --- DOM Elements ---
 let accountListEl,
@@ -37,6 +41,15 @@ let onDataChange = null;
 
 // ID akun yang sedang pending delete (untuk confirm dialog)
 let pendingDeleteId = null;
+
+// Filter state: 'all' | 'available' | 'limited'
+let currentFilter = 'all';
+
+// Set untuk track akun yang sudah pernah di-notify (cegah duplikat)
+const notifiedIds = new Set();
+
+// Interval ID untuk countdown timer
+let countdownInterval = null;
 
 /**
  * Inisialisasi UI.
@@ -60,9 +73,6 @@ export async function initUI(updateGlobeVisuals) {
   inputId = document.getElementById('input-id');
 
   // Fix scroll: Stop wheel event dari ditelan oleh Three.js OrbitControls
-  // OrbitControls pakai wheel event untuk zoom, dan dia call preventDefault()
-  // yang mem-block scroll pada panel di atasnya. Solusi: stop propagation
-  // agar event wheel yang terjadi di panel tidak sampai ke canvas.
   const sidePanel = document.getElementById('side-panel');
   sidePanel.addEventListener('wheel', (e) => {
     e.stopPropagation();
@@ -72,7 +82,7 @@ export async function initUI(updateGlobeVisuals) {
 
   // Tombol "Add" di panel header
   document.getElementById('btn-add-account').addEventListener('click', () => {
-    openModal(); // Buka modal dalam mode "add"
+    openModal();
   });
 
   // Tombol close modal
@@ -104,6 +114,19 @@ export async function initUI(updateGlobeVisuals) {
     }
   });
 
+  // --- Filter Buttons ---
+  document.querySelectorAll('.filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      // Update active state
+      document.querySelectorAll('.filter-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Set filter dan re-render
+      currentFilter = btn.dataset.filter;
+      renderAccountList(getAccounts());
+    });
+  });
+
   // Listen ke perubahan data dari accounts module
   onChange((accounts) => {
     renderAccountList(accounts);
@@ -124,11 +147,13 @@ export async function initUI(updateGlobeVisuals) {
   renderAccountList(accounts);
   renderStats();
   if (onDataChange) onDataChange(accounts);
+
+  // Start countdown timer — update setiap 1 detik
+  startCountdownTimer();
 }
 
 /**
  * Render stats bar di header.
- * Menampilkan: Total, Available, Limited
  */
 function renderStats() {
   const stats = getStats();
@@ -159,10 +184,7 @@ function renderStats() {
 }
 
 /**
- * Render daftar akun ke sidebar panel.
- * 
- * Jika tidak ada akun, tampilkan empty state.
- * Setiap card punya tombol edit dan delete.
+ * Render daftar akun ke sidebar panel, dengan filter applied.
  * 
  * @param {Array} accounts
  */
@@ -180,16 +202,31 @@ function renderAccountList(accounts) {
     return;
   }
 
-  accountListEl.innerHTML = accounts
+  // Apply filter
+  const filtered = currentFilter === 'all'
+    ? accounts
+    : accounts.filter((a) => a.status === currentFilter);
+
+  if (filtered.length === 0) {
+    accountListEl.innerHTML = `
+      <div class="empty-state">
+        <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)">// no ${currentFilter} accounts found</p>
+      </div>
+    `;
+    return;
+  }
+
+  accountListEl.innerHTML = filtered
     .map(
       (account, index) => {
         const isAvailable = account.status === 'available';
         const statusLabel = isAvailable ? 'ONLINE' : 'BLOCKED';
         const statusTextClass = isAvailable ? 'available' : 'limited';
         const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
+        const countdownHtml = renderCountdown(account);
 
         return `
-    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.08}s">
+    <div class="account-card status-${account.status}" style="animation-delay: ${index * 0.08}s" data-account-id="${account.id}">
       <!-- Terminal-style header bar -->
       <div class="card-header-bar">
         <div class="card-header-left">
@@ -225,7 +262,7 @@ function renderAccountList(accounts) {
           </div>
           <div class="card-meta-row">
             <span class="card-meta-key">reset</span>
-            <span class="card-meta-value">${formatDuration(account.refreshDays, account.refreshHours)}</span>
+            <span class="card-meta-value countdown-value" data-deadline="${account.refreshDeadline || ''}">${countdownHtml}</span>
           </div>
         </div>
       </div>
@@ -243,8 +280,103 @@ function renderAccountList(accounts) {
 }
 
 /**
+ * Render countdown string dari deadline.
+ * 
+ * Menghitung selisih antara deadline dan waktu sekarang,
+ * lalu format ke "Xd Xh Xm Xs" atau "READY ✓" jika sudah lewat.
+ * 
+ * @param {Object} account - Account object
+ * @returns {string} HTML string untuk countdown display
+ */
+function renderCountdown(account) {
+  const deadline = account.refreshDeadline;
+
+  // Fallback: jika tidak ada deadline, tampilkan static days/hours
+  if (!deadline) {
+    return formatDurationLegacy(account.refreshDays, account.refreshHours);
+  }
+
+  const now = Date.now();
+  const target = new Date(deadline).getTime();
+  const diff = target - now;
+
+  if (diff <= 0) {
+    return '<span class="countdown-ready">READY ✓</span>';
+  }
+
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+
+  const parts = [];
+  if (days > 0) parts.push(`<span class="cd-num">${days}</span><span class="cd-unit">d</span>`);
+  if (hours > 0 || days > 0) parts.push(`<span class="cd-num">${String(hours).padStart(2, '0')}</span><span class="cd-unit">h</span>`);
+  parts.push(`<span class="cd-num">${String(minutes).padStart(2, '0')}</span><span class="cd-unit">m</span>`);
+  parts.push(`<span class="cd-num">${String(seconds).padStart(2, '0')}</span><span class="cd-unit">s</span>`);
+
+  return parts.join(' ');
+}
+
+/**
+ * Start interval yang update semua countdown setiap 1 detik.
+ * Juga cek apakah ada countdown yang baru saja expired → trigger notifikasi.
+ */
+function startCountdownTimer() {
+  if (countdownInterval) clearInterval(countdownInterval);
+
+  countdownInterval = setInterval(() => {
+    const countdownEls = document.querySelectorAll('.countdown-value[data-deadline]');
+    
+    countdownEls.forEach((el) => {
+      const deadline = el.dataset.deadline;
+      if (!deadline) return;
+
+      const now = Date.now();
+      const target = new Date(deadline).getTime();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        // Countdown expired!
+        if (el.innerHTML !== '<span class="countdown-ready">READY ✓</span>') {
+          el.innerHTML = '<span class="countdown-ready">READY ✓</span>';
+
+          // Cari nama akun untuk notifikasi
+          const card = el.closest('.account-card');
+          const accountId = card?.dataset.accountId;
+
+          if (accountId && !notifiedIds.has(accountId)) {
+            notifiedIds.add(accountId);
+            const nameEl = card.querySelector('.card-name');
+            const accountName = nameEl?.textContent?.trim() || 'Unknown';
+
+            // Kirim browser notification + toast
+            sendNotification(accountName);
+            showToast(`🟢 "${accountName}" is ready! Quota has been refreshed.`, 'success');
+          }
+        }
+        return;
+      }
+
+      // Hitung countdown
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+
+      const parts = [];
+      if (days > 0) parts.push(`<span class="cd-num">${days}</span><span class="cd-unit">d</span>`);
+      if (hours > 0 || days > 0) parts.push(`<span class="cd-num">${String(hours).padStart(2, '0')}</span><span class="cd-unit">h</span>`);
+      parts.push(`<span class="cd-num">${String(minutes).padStart(2, '0')}</span><span class="cd-unit">m</span>`);
+      parts.push(`<span class="cd-num">${String(seconds).padStart(2, '0')}</span><span class="cd-unit">s</span>`);
+
+      el.innerHTML = parts.join(' ');
+    });
+  }, 1000);
+}
+
+/**
  * Handle klik pada tombol di dalam card akun.
- * Menggunakan event delegation: cek data-action dan data-id.
  */
 function handleCardAction(e) {
   const btn = e.target.closest('[data-action]');
@@ -266,12 +398,10 @@ function handleCardAction(e) {
  * @param {string|null} editId - Jika ada, modal dalam mode edit. Jika null, mode add.
  */
 function openModal(editId = null) {
-  // Reset form
   accountForm.reset();
   inputId.value = '';
 
   if (editId) {
-    // Mode Edit: isi form dengan data existing
     const accounts = getAccounts();
     const account = accounts.find((a) => a.id === editId);
     if (!account) return;
@@ -283,12 +413,10 @@ function openModal(editId = null) {
     inputHours.value = account.refreshHours ?? '';
     inputId.value = account.id;
   } else {
-    // Mode Add
     modalTitle.textContent = '// new_account';
   }
 
   modalOverlay.classList.remove('hidden');
-  // Focus ke field nama setelah animasi modal selesai
   setTimeout(() => inputName.focus(), 100);
 }
 
@@ -302,13 +430,9 @@ function closeModal() {
 
 /**
  * Handle submit form (Add atau Edit).
- * 
- * Cek apakah inputId ada value:
- * - Ada → Edit mode, panggil editAccount()
- * - Kosong → Add mode, panggil addAccount()
  */
 async function handleFormSubmit(e) {
-  e.preventDefault(); // Cegah form reload halaman
+  e.preventDefault();
 
   const name = inputName.value.trim();
   const status = inputStatus.value;
@@ -321,22 +445,20 @@ async function handleFormSubmit(e) {
   closeModal();
 
   if (id) {
-    // Edit existing account
+    // Edit — juga clear notified state karena timer mungkin di-reset
+    notifiedIds.delete(id);
     await editAccount(id, { name, status, refreshDays, refreshHours });
   } else {
-    // Add new account
     await addAccount({ name, status, refreshDays, refreshHours });
   }
 }
 
 /**
  * Buka confirm dialog untuk delete.
- * @param {string} id - ID akun yang akan dihapus
  */
 function openConfirm(id) {
   pendingDeleteId = id;
 
-  // Tampilkan nama akun di dialog
   const accounts = getAccounts();
   const account = accounts.find((a) => a.id === id);
   if (account) {
@@ -360,22 +482,22 @@ function closeConfirm() {
  */
 async function handleConfirmDelete() {
   if (pendingDeleteId) {
+    notifiedIds.delete(pendingDeleteId);
     await removeAccount(pendingDeleteId);
   }
   closeConfirm();
 }
 
 /**
- * Format durasi refresh ke string readable.
- * Contoh: (6, 12) → "6d 12h"
- *         (0, 4) → "4h"
- *         (null, null) → "--"
+ * Legacy format durasi untuk akun yang belum punya deadline.
+ * Fallback: jika refresh_deadline belum ada di database,
+ * tampilkan static "Xd Xh" dari refresh_days/refresh_hours.
  * 
  * @param {number|null} days
  * @param {number|null} hours
  * @returns {string}
  */
-function formatDuration(days, hours) {
+function formatDurationLegacy(days, hours) {
   const d = days ?? 0;
   const h = hours ?? 0;
   if (d === 0 && h === 0 && days === null && hours === null) return '--';
@@ -387,7 +509,6 @@ function formatDuration(days, hours) {
 
 /**
  * Escape HTML untuk mencegah XSS.
- * Penting ketika menampilkan user input di innerHTML.
  * 
  * @param {string} str
  * @returns {string}

@@ -7,7 +7,7 @@
     <meta name="description" content="Three.js globe dashboard to monitor vibe coding account limits and quota status in real-time." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>" />
   </head>
   <body>
@@ -49,6 +49,11 @@
           Add
         </button>
       </div>
+      <div class="panel-filters">
+        <button class="filter-btn active" data-filter="all">ALL</button>
+        <button class="filter-btn" data-filter="available">ACTIVE</button>
+        <button class="filter-btn" data-filter="limited">LIMITED</button>
+      </div>
       <div class="panel-body" id="account-list">
         <!-- Account cards will be injected by JS -->
       </div>
@@ -89,7 +94,12 @@
                 <span class="duration-sep">:</span>
                 <div class="duration-field">
                   <input type="number" id="input-hours" min="0" max="23" placeholder="0" />
-                  <span class="duration-label">hours</span>
+                  <span class="duration-label">hrs</span>
+                </div>
+                <span class="duration-sep">:</span>
+                <div class="duration-field">
+                  <input type="number" id="input-minutes" min="0" max="59" placeholder="0" />
+                  <span class="duration-label">min</span>
                 </div>
               </div>
               <span class="form-hint">time until quota refreshes</span>
@@ -119,6 +129,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>
