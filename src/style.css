@@ -247,10 +247,11 @@ html, body {
   right: 0;
   width: var(--panel-width);
   height: 100vh;
+  box-sizing: border-box; /* Important for flex height calculation */
   z-index: 20;
   background: var(--bg-glass);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-left: 1px solid var(--border-glass);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -1414,6 +1415,99 @@ html, body {
   transition: all var(--transition-fast);
 }
 
+/* ---------- ASCII Dashboard (Left Side Decoration) ---------- */
+#ascii-dashboard {
+  position: absolute;
+  left: 40px;
+  bottom: 40px;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through to globe */
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-cyan);
+  opacity: 0.6;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 16px 20px;
+  border-left: 2px solid var(--accent-cyan);
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.ascii-block pre {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.ascii-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+.glitch-text {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  position: relative;
+  display: inline-block;
+  color: var(--accent-green);
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.8;
+}
+
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -1px 0 red;
+  animation: glitch-anim-2 3s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -1px 0 blue;
+  animation: glitch-anim 2.5s infinite linear alternate-reverse;
+}
+
+/* GPU-accelerated glitch animation replacing expensive clip: rect */
+@keyframes glitch-anim {
+  0%, 100% { transform: translate(0); opacity: 0.8; }
+  20% { transform: translate(-2px, 1px); opacity: 0.8; }
+  21% { transform: translate(2px, -1px); opacity: 0.4; }
+  22% { transform: translate(-1px, 2px); opacity: 0.8; }
+  40% { transform: translate(0); opacity: 0.8; }
+  60% { transform: translate(1px, -1px); opacity: 0.8; }
+  61% { transform: translate(-2px, 1px); opacity: 0.3; }
+  62% { transform: translate(2px, 2px); opacity: 0.8; }
+  80% { transform: translate(0); opacity: 0.8; }
+}
+
+@keyframes glitch-anim-2 {
+  0%, 100% { transform: translate(0); opacity: 0.8; }
+  30% { transform: translate(2px, -1px); opacity: 0.8; }
+  31% { transform: translate(-2px, 2px); opacity: 0.5; }
+  32% { transform: translate(1px, -2px); opacity: 0.8; }
+  50% { transform: translate(0); opacity: 0.8; }
+  70% { transform: translate(-1px, 2px); opacity: 0.8; }
+  71% { transform: translate(2px, -1px); opacity: 0.4; }
+  72% { transform: translate(-2px, -2px); opacity: 0.8; }
+  90% { transform: translate(0); opacity: 0.8; }
+}
+
 #search-input::placeholder {
   color: var(--text-muted);
   opacity: 0.5;
@@ -1605,14 +1699,13 @@ html, body {
 
 /* ---------- Activity Log Console ---------- */
 .activity-log {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(5, 8, 14, 0.95);
-  border-top: 1px solid rgba(56, 189, 248, 0.1);
+  margin-top: auto; /* Push to bottom of flex container */
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid var(--border-subtle);
   z-index: 5;
-  transition: height 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transition: all var(--transition-smooth);
+  flex-shrink: 0;
   height: 180px;
 }
 

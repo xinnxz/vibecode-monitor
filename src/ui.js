@@ -949,8 +949,15 @@ function updateCountdowns() {
           const accounts = getAccounts();
           const account = accounts.find((a) => a.id === accountId);
           if (account && account.status === 'limited') {
-            editAccount(accountId, { status: 'available' });
-            addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
+            // Jalankan update secara asinkron tanpa nge-block render frame UI
+            (async () => {
+              try {
+                await editAccount(accountId, { status: 'available' });
+                addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
+              } catch (err) {
+                console.error("Auto-status update failed:", err);
+              }
+            })();
           }
         }
       }

@@ -68,6 +68,7 @@ let scene, camera, renderer, controls;
 let earthGroup, mainGroup;
 let earthMesh;
 let starPoints;
+let moonMesh, spaceBackground;
 let waveMeshArr = [];
 let circleLineList = [];
 let flyLineArcGroup;
@@ -100,6 +101,9 @@ function loadTextures() {
     light_column: loader.load(basePath + 'light_column.png'),
     label: loader.load(basePath + 'label.png'),
     redCircle: loader.load(basePath + 'redCircle.png'),
+    moon: loader.load(basePath + 'moon.jpg'),
+    starmap: loader.load(basePath + 'starmap.jpg'),
+    galaxy: loader.load(basePath + 'galaxy.jpg'),
   };
 }
 
@@ -133,10 +137,17 @@ export function initGlobe(container) {
     powerPreference: 'high-performance',
   });
   renderer.setSize(getWidth(), window.innerHeight);
+  // Reverted to 2 for crisp, high-resolution display
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
+
+  // Apply maximum anisotropy to textures for ultimate crispness
+  const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (textures.earth) textures.earth.anisotropy = maxAnisotropy;
+  if (textures.moon) textures.moon.anisotropy = maxAnisotropy;
+  if (textures.galaxy) textures.galaxy.anisotropy = maxAnisotropy;
 
   // --- Controls ---
   controls = new OrbitControls(camera, renderer.domElement);
@@ -173,7 +184,7 @@ export function initGlobe(container) {
   createEarth();
   createEarthGlow();
   createEarthAperture();
-  createStars();
+  createSpaceEnvironment();
   createSatelliteOrbits();
 
   // --- GSAP Entry Animation ---
@@ -352,37 +363,91 @@ function createEarthAperture() {
 }
 
 // ============================================================
-// STARS
+// SPACE ENVIRONMENT (Galaxy, Moon, Stars)
 // ============================================================
 
-function createStars() {
+function createSpaceEnvironment() {
+  // 1. High-Quality Galaxy Background (Skybox)
+  const skyboxGeo = new THREE.SphereGeometry(1500, 64, 64);
+  const skyboxMat = new THREE.MeshBasicMaterial({
+    map: textures.galaxy,
+    side: THREE.BackSide,
+    color: 0xaaaaaa, // Dim slightly
+    transparent: true,
+    opacity: 0.6
+  });
+  spaceBackground = new THREE.Mesh(skyboxGeo, skyboxMat);
+  scene.add(spaceBackground);
+
+  // 2. Realistic Moon
+  const R = CONFIG.earth.radius;
+  const moonGeo = new THREE.SphereGeometry(R * 0.25, 32, 32);
+  const moonMat = new THREE.MeshStandardMaterial({
+    map: textures.moon,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+  moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  
+  // Position the moon
+  moonMesh.position.set(160, 60, -100);
+  
+  // Add lighting for the moon
+  const moonLight = new THREE.PointLight(0xffffff, 2, 800);
+  moonLight.position.set(250, 100, 100);
+  scene.add(moonLight);
+
+  // Add subtle ambient light to keep things from being pure black
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+  scene.add(ambientLight);
+
+  scene.add(moonMesh);
+
+  // 3. Dynamic Stars
   const vertices = [];
+  const sizes = [];
   const colors = [];
-  for (let i = 0; i < 500; i++) {
-    vertices.push(
-      800 * Math.random() - 300,
-      800 * Math.random() - 300,
-      800 * Math.random() - 300
-    );
-    colors.push(1, 1, 1);
+  const startColor = new THREE.Color();
+  
+  for (let i = 0; i < 3000; i++) {
+    const x = 2000 * Math.random() - 1000;
+    const y = 2000 * Math.random() - 1000;
+    const z = 2000 * Math.random() - 1000;
+    
+    // Create a hollow sphere so stars don't clip inside the earth
+    if (Math.abs(x) < 200 && Math.abs(y) < 200 && Math.abs(z) < 200) continue;
+    
+    vertices.push(x, y, z);
+    sizes.push(Math.random() * 2 + 0.5);
+    
+    // Varying star temperatures (blue, white, orange)
+    const temp = Math.random();
+    if (temp > 0.8) startColor.setHex(0xaabfff); // Blueish
+    else if (temp > 0.4) startColor.setHex(0xffffff); // White
+    else startColor.setHex(0xffdfb3); // Orangeish
+    
+    colors.push(startColor.r, startColor.g, startColor.b);
   }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(sizes), 1));
 
   const mat = new THREE.PointsMaterial({
-    size: 2,
+    size: 2.5,
     sizeAttenuation: true,
-    color: 0x4d76cf,
     transparent: true,
-    opacity: 1,
-    map: textures.gradient,
+    opacity: 0.8,
+    map: textures.aperture, // Use soft glowing circle
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    vertexColors: true
   });
 
   starPoints = new THREE.Points(geo, mat);
   starPoints.name = 'stars';
-  mainGroup.add(starPoints);
+  scene.add(starPoints);
 }
 
 // ============================================================
@@ -638,6 +703,25 @@ function animate() {
   circleLineList.forEach((line) => {
     line.rotateY(CONFIG.satellite.rotateSpeed);
   });
+
+  // Rotate space slowly
+  if (spaceBackground) {
+    spaceBackground.rotation.y -= 0.0003;
+    spaceBackground.rotation.x += 0.0001;
+  }
+  
+  // Orbit moon slowly
+  if (moonMesh) {
+    const time = Date.now() * 0.0001;
+    moonMesh.position.x = Math.sin(time) * 160;
+    moonMesh.position.z = Math.cos(time) * 160;
+    moonMesh.rotation.y += 0.001; // Moon rotates on its axis
+  }
+  
+  // Scintillation for stars (twinkle)
+  if (starPoints && starPoints.material) {
+    starPoints.material.opacity = 0.5 + Math.sin(Date.now() * 0.002) * 0.3;
+  }
 
   // Scan line animation (shader uniform)
   if (uniforms) {
