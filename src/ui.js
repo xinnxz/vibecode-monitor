@@ -23,6 +23,10 @@ import {
 } from './accounts.js';
 
 import { sendNotification } from './notifications.js';
+import { addLog } from './activity-log.js';
+import { getHistory } from './history.js';
+import { getWebhookConfig, saveWebhookConfig, sendWebhookNotification } from './webhook.js';
+import { playClick, playConfirm, playDelete, playAlert } from './sounds.js';
 
 // --- DOM Elements ---
 let accountListEl,
@@ -35,10 +39,33 @@ let accountListEl,
   inputStatus,
   inputDays,
   inputHours,
-  inputMinutes,
   inputId,
   searchInput,
-  sortSelect;
+  sortSelect,
+  inputTags,
+  inputNotes,
+  btnSelectMode,
+  bulkActionBar,
+  chkSelectAll,
+  bulkCount,
+  btnBulkAvailable,
+  btnBulkLimited,
+  btnBulkDelete,
+  historyModalOverlay,
+  btnHistoryClose,
+  historyList,
+  settingsModalOverlay,
+  btnSettingsOpen,
+  btnSettingsClose,
+  btnSettingsCancel,
+  settingsForm,
+  inputDiscordUrl,
+  inputTelegramToken,
+  inputTelegramChatId;
+
+// State untuk Bulk Actions
+let isSelectMode = false;
+const selectedAccounts = new Set();
 
 // Fungsi callback untuk update globe visuals
 let onDataChange = null;
@@ -88,6 +115,26 @@ export async function initUI(updateGlobeVisuals) {
   inputId = document.getElementById('input-id');
   searchInput = document.getElementById('search-input');
   sortSelect = document.getElementById('sort-select');
+  inputTags = document.getElementById('input-tags');
+  inputNotes = document.getElementById('input-notes');
+  btnSelectMode = document.getElementById('btn-select-mode');
+  bulkActionBar = document.getElementById('bulk-action-bar');
+  chkSelectAll = document.getElementById('chk-select-all');
+  bulkCount = document.getElementById('bulk-count');
+  btnBulkAvailable = document.getElementById('btn-bulk-available');
+  btnBulkLimited = document.getElementById('btn-bulk-limited');
+  btnBulkDelete = document.getElementById('btn-bulk-delete');
+  historyModalOverlay = document.getElementById('history-modal-overlay');
+  btnHistoryClose = document.getElementById('btn-history-close');
+  historyList = document.getElementById('history-list');
+  settingsModalOverlay = document.getElementById('settings-modal-overlay');
+  btnSettingsOpen = document.getElementById('btn-settings-open');
+  btnSettingsClose = document.getElementById('btn-settings-close');
+  btnSettingsCancel = document.getElementById('btn-settings-cancel');
+  settingsForm = document.getElementById('settings-form');
+  inputDiscordUrl = document.getElementById('input-discord-url');
+  inputTelegramToken = document.getElementById('input-telegram-token');
+  inputTelegramChatId = document.getElementById('input-telegram-chatid');
 
   // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
   // OrbitControls memasang wheel listener di renderer.domElement;
@@ -138,9 +185,40 @@ export async function initUI(updateGlobeVisuals) {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!modalOverlay.classList.contains('hidden')) closeModal();
-      if (!confirmOverlay.classList.contains('hidden')) closeConfirm();
+      else if (!confirmOverlay.classList.contains('hidden')) closeConfirm();
+      else if (historyModalOverlay && !historyModalOverlay.classList.contains('hidden')) closeHistoryModal();
+      else if (settingsModalOverlay && !settingsModalOverlay.classList.contains('hidden')) closeSettingsModal();
+      else if (isSelectMode) toggleSelectMode();
     }
   });
+
+  // History modal bindings
+  if (btnHistoryClose) {
+    btnHistoryClose.addEventListener('click', closeHistoryModal);
+  }
+  if (historyModalOverlay) {
+    historyModalOverlay.addEventListener('click', (e) => {
+      if (e.target === historyModalOverlay) closeHistoryModal();
+    });
+  }
+
+  // Settings modal bindings
+  if (btnSettingsOpen) btnSettingsOpen.addEventListener('click', openSettingsModal);
+  if (btnSettingsClose) btnSettingsClose.addEventListener('click', closeSettingsModal);
+  if (btnSettingsCancel) btnSettingsCancel.addEventListener('click', closeSettingsModal);
+  if (settingsForm) settingsForm.addEventListener('submit', handleSettingsSubmit);
+  if (settingsModalOverlay) {
+    settingsModalOverlay.addEventListener('click', (e) => {
+      if (e.target === settingsModalOverlay) closeSettingsModal();
+    });
+  }
+
+  // --- Bulk Actions ---
+  if (btnSelectMode) btnSelectMode.addEventListener('click', toggleSelectMode);
+  if (chkSelectAll) chkSelectAll.addEventListener('change', handleSelectAll);
+  if (btnBulkAvailable) btnBulkAvailable.addEventListener('click', () => handleBulkAction('available'));
+  if (btnBulkLimited) btnBulkLimited.addEventListener('click', () => handleBulkAction('limited'));
+  if (btnBulkDelete) btnBulkDelete.addEventListener('click', () => handleBulkAction('delete'));
 
   // --- Filter Buttons ---
   document.querySelectorAll('.filter-btn').forEach((btn) => {
@@ -280,10 +358,27 @@ function renderAccountList(accounts) {
         const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
         const countdownHtml = renderCountdown(account);
 
+        const tagsHtml = (account.tags && account.tags.length > 0)
+          ? `<div class="card-tags">${account.tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
+          : '';
+
+        const notesHtml = account.notes
+          ? `<div class="card-notes" title="Notes">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+               </svg>
+               <span class="note-text">${escapeHtml(account.notes)}</span>
+             </div>`
+          : '';
+
         return `
-    <div class="account-card status-${account.status}" 
+    <div class="account-card status-${account.status} ${selectedAccounts.has(account.id) ? 'selected' : ''}" 
          style="animation-delay: ${index * 0.08}s" 
          data-account-id="${account.id}">
+      <!-- Checkbox for Select Mode -->
+      <div class="card-checkbox-wrapper ${isSelectMode ? '' : 'hidden'}">
+        <input type="checkbox" class="hacker-checkbox card-checkbox" value="${account.id}" ${selectedAccounts.has(account.id) ? 'checked' : ''} />
+      </div>
       <!-- Terminal-style header bar (drag handle) -->
       <div class="card-header-bar card-drag-handle">
         <div class="card-header-left">
@@ -291,6 +386,12 @@ function renderAccountList(accounts) {
           <span>${statusLabel}</span>
         </div>
         <div class="card-header-actions">
+          <button class="btn-icon history" title="History Log" data-action="history" data-id="${account.id}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </button>
           <button class="btn-icon edit" title="Edit" data-action="edit" data-id="${account.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -312,6 +413,8 @@ function renderAccountList(accounts) {
           <span class="card-name-prefix">&gt;</span>
           ${escapeHtml(account.name)}
         </div>
+        ${tagsHtml}
+        ${notesHtml}
         <div class="card-meta">
           <div class="card-meta-row">
             <span class="card-meta-key">status</span>
@@ -332,13 +435,117 @@ function renderAccountList(accounts) {
     )
     .join('');
 
-  // Event delegation untuk button actions
+  // Event delegation untuk button actions & checkboxes
   // Hapus listener lama, tambah baru (avoid stacking)
   accountListEl.removeEventListener('click', handleCardAction);
   accountListEl.addEventListener('click', handleCardAction);
+  accountListEl.removeEventListener('change', handleCardCheckbox);
+  accountListEl.addEventListener('change', handleCardCheckbox);
 
   // Setup drag-to-reorder (custom pointer-based)
-  setupDragAndDrop();
+  // Disable drag if in select mode
+  if (!isSelectMode) {
+    setupDragAndDrop();
+  }
+}
+
+// ============================================================
+// BULK ACTIONS LOGIC
+// ============================================================
+
+function toggleSelectMode() {
+  isSelectMode = !isSelectMode;
+  selectedAccounts.clear();
+  
+  if (isSelectMode) {
+    accountListEl.classList.add('select-mode-active');
+    bulkActionBar.classList.remove('hidden');
+    btnSelectMode.style.color = 'var(--accent-cyan)';
+    playClick();
+  } else {
+    accountListEl.classList.remove('select-mode-active');
+    bulkActionBar.classList.add('hidden');
+    btnSelectMode.style.color = '';
+    playClick();
+  }
+  
+  updateBulkUI();
+  renderAccountList(getAccounts()); // Re-render to show/hide checkboxes
+}
+
+function handleCardCheckbox(e) {
+  if (e.target.classList.contains('card-checkbox')) {
+    const id = e.target.value;
+    if (e.target.checked) {
+      selectedAccounts.add(id);
+    } else {
+      selectedAccounts.delete(id);
+    }
+    updateBulkUI();
+    playClick();
+  }
+}
+
+function handleSelectAll(e) {
+  const isChecked = e.target.checked;
+  // Let's only select/deselect the currently visible accounts
+  const visibleCards = accountListEl.querySelectorAll('.account-card');
+  
+  visibleCards.forEach(card => {
+    const id = card.dataset.accountId;
+    if (isChecked) {
+      selectedAccounts.add(id);
+    } else {
+      selectedAccounts.delete(id);
+    }
+  });
+  
+  updateBulkUI();
+  playClick();
+  
+  // Need to update actual checkboxes in DOM
+  const checkboxes = accountListEl.querySelectorAll('.card-checkbox');
+  checkboxes.forEach(cb => cb.checked = isChecked);
+}
+
+function updateBulkUI() {
+  if (bulkCount) bulkCount.textContent = `${selectedAccounts.size} selected`;
+  if (chkSelectAll) {
+    // Check if all visible are selected
+    const visibleCards = accountListEl.querySelectorAll('.account-card').length;
+    chkSelectAll.checked = visibleCards > 0 && selectedAccounts.size === visibleCards;
+  }
+}
+
+async function handleBulkAction(action) {
+  if (selectedAccounts.size === 0) return;
+  
+  const ids = Array.from(selectedAccounts);
+  const count = ids.length;
+  
+  try {
+    if (action === 'available' || action === 'limited') {
+      // Parallel update
+      await Promise.all(ids.map(id => editAccount(id, { status: action })));
+      addLog('SYSTEM', `Bulk updated ${count} accounts to ${action}`);
+      playConfirm();
+    } else if (action === 'delete') {
+      if (!confirm(`Are you sure you want to terminate ${count} selected accounts?`)) return;
+      // Parallel delete
+      await Promise.all(ids.map(id => {
+        notifiedIds.delete(id);
+        return removeAccount(id);
+      }));
+      addLog('SYSTEM', `Bulk deleted ${count} accounts`);
+      playDelete();
+    }
+  } catch (err) {
+    console.error('Bulk action error:', err);
+    addLog('SYSTEM', `Bulk action failed`);
+  }
+  
+  // Exit select mode
+  toggleSelectMode();
 }
 
 // ============================================================
@@ -730,6 +937,11 @@ function updateCountdowns() {
 
           // Kirim notification (browser + notification center)
           sendNotification(accountName);
+          // Kirim webhook
+          sendWebhookNotification(accountName);
+          
+          addLog('TIMER_EXPIRED', `"${accountName}" → READY`);
+          playAlert();
 
           // AUTO-STATUS TOGGLE:
           // Jika akun masih "limited", otomatis ubah ke "available"
@@ -737,6 +949,7 @@ function updateCountdowns() {
           const account = accounts.find((a) => a.id === accountId);
           if (account && account.status === 'limited') {
             editAccount(accountId, { status: 'available' });
+            addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
           }
         }
       }
@@ -766,6 +979,8 @@ function handleCardAction(e) {
     openModal(id);
   } else if (action === 'delete') {
     openConfirm(id);
+  } else if (action === 'history') {
+    openHistoryModal(id);
   }
 }
 
@@ -787,6 +1002,8 @@ function openModal(editId = null) {
     inputDays.value = account.refreshDays ?? '';
     inputHours.value = account.refreshHours ?? '';
     inputMinutes.value = account.refreshMinutes ?? '';
+    inputTags.value = account.tags ? account.tags.join(', ') : '';
+    inputNotes.value = account.notes ?? '';
     inputId.value = account.id;
   } else {
     modalTitle.textContent = '// new_account';
@@ -799,6 +1016,8 @@ function openModal(editId = null) {
 function closeModal() {
   modalOverlay.classList.add('hidden');
   accountForm.reset();
+  if (inputTags) inputTags.value = '';
+  if (inputNotes) inputNotes.value = '';
 }
 
 /**
@@ -813,6 +1032,9 @@ async function handleFormSubmit(e) {
   const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
   const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
   const refreshMinutes = inputMinutes.value !== '' ? parseInt(inputMinutes.value, 10) : null;
+  const tagsRaw = inputTags.value.trim();
+  const tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const notes = inputNotes.value.trim();
   const id = inputId.value;
 
   if (!name) return;
@@ -821,9 +1043,13 @@ async function handleFormSubmit(e) {
 
   if (id) {
     notifiedIds.delete(id);
-    await editAccount(id, { name, status, refreshDays, refreshHours, refreshMinutes });
+    await editAccount(id, { name, status, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    addLog('ACCOUNT_EDITED', `"${name}" updated (status: ${status})`);
+    playConfirm();
   } else {
-    await addAccount({ name, status, refreshDays, refreshHours, refreshMinutes });
+    await addAccount({ name, status, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    addLog('ACCOUNT_ADDED', `"${name}" registered (status: ${status})`);
+    playConfirm();
   }
 }
 
@@ -847,10 +1073,82 @@ function closeConfirm() {
 
 async function handleConfirmDelete() {
   if (pendingDeleteId) {
+    const accounts = getAccounts();
+    const account = accounts.find((a) => a.id === pendingDeleteId);
+    const deletedName = account?.name || 'unknown';
     notifiedIds.delete(pendingDeleteId);
     await removeAccount(pendingDeleteId);
+    addLog('ACCOUNT_DELETED', `"${deletedName}" terminated`);
+    playDelete();
   }
   closeConfirm();
+}
+
+async function openHistoryModal(id) {
+  const accounts = getAccounts();
+  const account = accounts.find((a) => a.id === id);
+  if (!account) return;
+
+  document.getElementById('history-modal-title').textContent = `// history: ${account.name}`;
+  historyList.innerHTML = '<p class="notif-empty">// fetching data...</p>';
+  historyModalOverlay.classList.remove('hidden');
+
+  const history = await getHistory(id);
+  
+  if (!history || history.length === 0) {
+    historyList.innerHTML = '<p class="notif-empty">// no history found</p>';
+    return;
+  }
+
+  historyList.innerHTML = history.map(item => {
+    // Assuming item.timestamp exists
+    const dateOpts = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    const date = new Date(item.timestamp || item.created_at || Date.now()).toLocaleString(undefined, dateOpts);
+    
+    let detail = '';
+    if (item.old_status && item.new_status) {
+      detail = `<br/><span style="color:var(--text-muted)">${item.old_status}</span> ➔ <span style="color:var(--accent-cyan)">${item.new_status}</span>`;
+    } else if (item.new_status) {
+      detail = `<br/>➔ <span style="color:var(--accent-cyan)">${item.new_status}</span>`;
+    }
+    
+    return `
+      <div class="log-entry" style="margin-bottom:12px; font-family:'JetBrains Mono', monospace; font-size:11px;">
+        <span class="log-time" style="color:var(--text-muted)">[${date}]</span>
+        <span class="log-type" style="color:var(--accent-green); margin-left:8px;">${item.event}</span>
+        ${detail}
+      </div>
+    `;
+  }).join('');
+}
+
+function closeHistoryModal() {
+  historyModalOverlay.classList.add('hidden');
+}
+
+// Settings Modal
+function openSettingsModal() {
+  const config = getWebhookConfig();
+  if (inputDiscordUrl) inputDiscordUrl.value = config.discordUrl;
+  if (inputTelegramToken) inputTelegramToken.value = config.telegramToken;
+  if (inputTelegramChatId) inputTelegramChatId.value = config.telegramChatId;
+  settingsModalOverlay.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModalOverlay.classList.add('hidden');
+}
+
+function handleSettingsSubmit(e) {
+  e.preventDefault();
+  const discordUrl = inputDiscordUrl ? inputDiscordUrl.value.trim() : '';
+  const telegramToken = inputTelegramToken ? inputTelegramToken.value.trim() : '';
+  const telegramChatId = inputTelegramChatId ? inputTelegramChatId.value.trim() : '';
+
+  saveWebhookConfig({ discordUrl, telegramToken, telegramChatId });
+  closeSettingsModal();
+  addLog('SYSTEM', 'Webhook settings saved');
+  playConfirm();
 }
 
 // ============================================================

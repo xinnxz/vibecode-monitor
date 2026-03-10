@@ -116,11 +116,57 @@
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
           </svg>
         </button>
+        <div class="toolbar-divider" style="width:1px;height:16px;background:rgba(255,255,255,0.1);margin:0 4px;"></div>
+        <button id="btn-export" class="btn-icon" title="Export JSON Backup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+        <label for="input-import" class="btn-icon" title="Import JSON Backup" style="cursor:pointer;margin-bottom:0;display:flex;align-items:center;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </label>
+        <input type="file" id="input-import" accept=".json" style="display:none;" />
+        <div class="toolbar-divider" style="width:1px;height:16px;background:rgba(255,255,255,0.1);margin:0 4px;"></div>
+        <button id="btn-select-mode" class="btn-icon" title="Toggle Select Mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <polyline points="9 11 12 14 22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+        </button>
+        <button id="btn-settings-open" class="btn-icon" title="Notification Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </div>
       <div class="panel-body" id="account-list">
         <!-- Matrix Rain Canvas (background) -->
         <canvas id="matrix-canvas"></canvas>
         <!-- Account cards will be injected by JS -->
+      </div>
+      <!-- Floating Bulk Action Bar -->
+      <div id="bulk-action-bar" class="bulk-action-bar hidden">
+        <div class="bulk-action-left">
+          <input type="checkbox" id="chk-select-all" class="hacker-checkbox" />
+          <span id="bulk-count">0 selected</span>
+        </div>
+        <div class="bulk-action-right">
+          <button id="btn-bulk-available" class="btn-bulk btn-bulk-green" title="Set Available">●</button>
+          <button id="btn-bulk-limited" class="btn-bulk btn-bulk-red" title="Set Limited">✕</button>
+          <button id="btn-bulk-delete" class="btn-bulk btn-bulk-outline" title="Delete Selected">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
       </div>
       <!-- Activity Log Console -->
       <div id="activity-log" class="activity-log collapsed">
@@ -178,6 +224,14 @@
               </div>
               <span class="form-hint">time until quota refreshes</span>
             </div>
+            <div class="form-group">
+              <label for="input-tags">tags (comma separated)</label>
+              <input type="text" id="input-tags" placeholder="AI, Prod, Cursor" />
+            </div>
+            <div class="form-group">
+              <label for="input-notes">notes</label>
+              <textarea id="input-notes" placeholder="Any additional information..." rows="2"></textarea>
+            </div>
             <input type="hidden" id="input-id" />
             <div class="form-actions">
               <button type="button" id="btn-cancel" class="btn-secondary">Abort</button>
@@ -200,6 +254,63 @@
             <button id="btn-confirm-cancel" class="btn-secondary">Abort</button>
             <button id="btn-confirm-delete" class="btn-danger">Confirm</button>
           </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal-overlay" class="modal-overlay hidden">
+      <div class="modal" id="history-modal">
+        <div class="modal-header">
+          <h3 id="history-modal-title">// account_history</h3>
+          <button id="btn-history-close" class="btn-icon" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="history-list" class="log-list" style="max-height: 300px; display: block; border-left: 1px solid rgba(56, 189, 248, 0.2); padding-left: 8px;">
+            <p class="notif-empty">// loading history data...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal-overlay" class="modal-overlay hidden">
+      <div class="modal" id="settings-modal" style="width: 480px;">
+        <div class="modal-header">
+          <h3 id="settings-modal-title">// notification_settings</h3>
+          <button id="btn-settings-close" class="btn-icon" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="settings-form">
+            <div class="form-group">
+              <label for="input-discord-url">Discord Webhook URL</label>
+              <input type="url" id="input-discord-url" placeholder="https://discord.com/api/webhooks/..." />
+            </div>
+            <div class="form-group" style="margin-top: 16px;">
+              <label for="input-telegram-token">Telegram Bot Token</label>
+              <input type="text" id="input-telegram-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" />
+            </div>
+            <div class="form-group">
+              <label for="input-telegram-chatid">Telegram Chat ID</label>
+              <input type="text" id="input-telegram-chatid" placeholder="-1001234567890" />
+            </div>
+            
+            <div class="form-actions" style="margin-top: 24px;">
+              <button type="button" id="btn-settings-cancel" class="btn-secondary">Abort</button>
+              <button type="submit" class="btn-primary">Save Config</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

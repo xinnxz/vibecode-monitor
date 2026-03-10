@@ -23,6 +23,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { logHistory } from './history.js';
 
 /**
  * Local cache — mirror data dari Supabase agar getStats() tetap synchronous.
@@ -53,6 +54,8 @@ function fromDb(row) {
     refreshHours: row.refresh_hours,
     refreshMinutes: row.refresh_minutes ?? null,
     refreshDeadline: row.refresh_deadline ?? null,
+    tags: row.tags || [],
+    notes: row.notes || '',
     createdAt: row.created_at,
   };
 }
@@ -74,6 +77,8 @@ function toDb(data) {
   if (data.refreshDays !== undefined) row.refresh_days = data.refreshDays;
   if (data.refreshHours !== undefined) row.refresh_hours = data.refreshHours;
   if (data.refreshMinutes !== undefined) row.refresh_minutes = data.refreshMinutes;
+  if (data.tags !== undefined) row.tags = data.tags;
+  if (data.notes !== undefined) row.notes = data.notes;
 
   // Hitung deadline dari days + hours + minutes jika tersedia
   const days = data.refreshDays ?? 0;
@@ -107,7 +112,52 @@ export async function fetchAccounts() {
   }
 
   cachedAccounts = data.map(fromDb);
+
+  // Setup Realtime Sync
+  setupRealtimeSync();
+
   return cachedAccounts;
+}
+
+/**
+ * Supabase Realtime Channel
+ * Menerima update dari database secara instan (berguna untuk multi-device/multi-tab syncing).
+ */
+function setupRealtimeSync() {
+  supabase.channel('public:accounts')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, (payload) => {
+      handleRealtimeUpdate(payload);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('🔗 Realtime sync active');
+      }
+    });
+}
+
+function handleRealtimeUpdate(payload) {
+  const { eventType, new: newRow, old: oldRow } = payload;
+  
+  if (eventType === 'INSERT') {
+    // Hindari duplikat dari mutasi local
+    if (!cachedAccounts.find((a) => a.id === newRow.id)) {
+      cachedAccounts.push(fromDb(newRow));
+      notifyListeners(cachedAccounts);
+    }
+  } else if (eventType === 'UPDATE') {
+    const index = cachedAccounts.findIndex((a) => a.id === newRow.id);
+    if (index !== -1) {
+      // Update data cache dengan row terbaru dari server
+      cachedAccounts[index] = fromDb(newRow);
+      notifyListeners(cachedAccounts);
+    }
+  } else if (eventType === 'DELETE') {
+    const index = cachedAccounts.findIndex((a) => a.id === oldRow.id);
+    if (index !== -1) {
+      cachedAccounts.splice(index, 1);
+      notifyListeners(cachedAccounts);
+    }
+  }
 }
 
 /**
@@ -126,10 +176,10 @@ export function getAccounts() {
  * @param {Object} data - { name, status, refreshDays, refreshHours, refreshMinutes }
  * @returns {Promise<Object|null>} Akun yang baru dibuat
  */
-export async function addAccount({ name, status, refreshDays, refreshHours, refreshMinutes }) {
+export async function addAccount({ name, status, refreshDays, refreshHours, refreshMinutes, tags, notes }) {
   const { data, error } = await supabase
     .from('accounts')
-    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours, refreshMinutes }))
+    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours, refreshMinutes, tags, notes }))
     .select()   // Return inserted row
     .single();  // Expect exactly 1 row
 
@@ -141,6 +191,7 @@ export async function addAccount({ name, status, refreshDays, refreshHours, refr
   const newAccount = fromDb(data);
   cachedAccounts.push(newAccount);
   notifyListeners(cachedAccounts);
+  logHistory(newAccount.id, 'ACCOUNT_CREATED', null, newAccount.status);
   return newAccount;
 }
 
@@ -164,11 +215,19 @@ export async function editAccount(id, updates) {
     return null;
   }
 
-  // Update local cache
   const updated = fromDb(data);
   const index = cachedAccounts.findIndex((a) => a.id === id);
+  const oldStatus = index !== -1 ? cachedAccounts[index].status : null;
+  
   if (index !== -1) cachedAccounts[index] = updated;
   notifyListeners(cachedAccounts);
+  
+  if (updates.status && oldStatus && updates.status !== oldStatus) {
+    logHistory(id, 'STATUS_CHANGED', oldStatus, updates.status);
+  } else {
+    logHistory(id, 'ACCOUNT_UPDATED', oldStatus, updated.status);
+  }
+  
   return updated;
 }
 
@@ -190,8 +249,11 @@ export async function removeAccount(id) {
   }
 
   // Update local cache
+  const account = cachedAccounts.find((a) => a.id === id);
+  const oldStatus = account ? account.status : null;
   cachedAccounts = cachedAccounts.filter((a) => a.id !== id);
   notifyListeners(cachedAccounts);
+  logHistory(id, 'ACCOUNT_DELETED', oldStatus, 'deleted');
   return true;
 }
 

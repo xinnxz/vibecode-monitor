@@ -331,7 +331,7 @@ html, body {
   top: 144px;  /* header(64) + filters(40) + toolbar(40) */
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: 32px; /* space for activity log toggle */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px 24px;
@@ -563,6 +563,54 @@ html, body {
   color: var(--accent-cyan);
   opacity: 0.5;
   font-weight: 400;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tag-badge {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--accent-cyan);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.card-notes {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-left: 2px solid var(--accent-cyan);
+}
+
+.card-notes svg {
+  color: var(--accent-cyan);
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.card-notes .note-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
 }
 
 .card-meta {
@@ -1384,6 +1432,127 @@ html, body {
 .panel-body .empty-state {
   position: relative;
   z-index: 1;
+}
+
+/* ---------- Bulk Action Bar & Checkboxes ---------- */
+.bulk-action-bar {
+  position: absolute;
+  bottom: 32px; /* right above activity log */
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: rgba(5, 8, 14, 0.95);
+  border-top: 1px solid var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 10;
+  transform: translateY(0);
+  transition: transform 0.3s ease;
+}
+
+.bulk-action-bar.hidden {
+  display: flex !important; /* Keep flex for animation */
+  transform: translateY(100%);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bulk-action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-cyan);
+}
+
+.bulk-action-right {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-bulk {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-bulk-green:hover { border-color: var(--accent-green); color: var(--accent-green); background: rgba(52, 211, 153, 0.1); }
+.btn-bulk-red:hover { border-color: var(--accent-red); color: var(--accent-red); background: rgba(248, 113, 113, 0.1); }
+.btn-bulk-outline:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* Checkboxes */
+.hacker-checkbox {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.hacker-checkbox:checked {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent-cyan);
+}
+
+.hacker-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--accent-cyan);
+  font-size: 10px;
+  font-weight: bold;
+}
+
+/* Card Checkbox Wrapper */
+.card-checkbox-wrapper {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 4px;
+  padding: 4px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.card-checkbox-wrapper.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+.select-mode-active .account-card {
+  border-style: dashed;
+}
+.select-mode-active .card-checkbox-wrapper {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+.select-mode-active .card-drag-handle {
+  pointer-events: none; /* Disable drag in select mode */
 }
 
 /* ---------- Activity Log Console ---------- */
