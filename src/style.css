@@ -1266,14 +1266,39 @@ html, body {
   z-index: 10000;
   background: #0a0e17;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   transition: opacity 0.8s ease;
+  cursor: pointer;
 }
 
 #boot-screen.fade-out {
   opacity: 0;
   pointer-events: none;
+}
+
+/* Waiting state: hide boot lines, show prompt */
+#boot-screen.boot-waiting .boot-terminal {
+  display: none;
+}
+
+.boot-prompt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--accent-cyan);
+  animation: prompt-blink 1.2s ease-in-out infinite;
+  letter-spacing: 2px;
+}
+
+@keyframes prompt-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Hide prompt once boot starts */
+#boot-screen:not(.boot-waiting) .boot-prompt {
+  display: none;
 }
 
 .boot-terminal {
@@ -1288,7 +1313,7 @@ html, body {
 .boot-line {
   opacity: 0;
   animation: boot-reveal 0.1s forwards;
-  animation-delay: calc(var(--delay) * 0.45s);
+  animation-delay: calc(var(--delay) * 0.25s);
   white-space: nowrap;
 }
 

@@ -9,8 +9,8 @@
  * 4. Import dan inisialisasi semua sub-modules
  * 5. Menghubungkan UI events ke Globe visuals
  * 
- * Flow data:
- * User interact → UI → accounts.js (Supabase) → onChange callback → UI re-render + Globe update
+ * Flow:
+ * Boot screen (click to start) → notification sound → boot animation → fade out → ambient music starts
  */
 
 import './style.css';
@@ -21,7 +21,7 @@ import { initActivityLog } from './activity-log.js';
 import { initMatrixRain } from './matrix-rain.js';
 import { toggleSound } from './sounds.js';
 import { downloadBackup, handleImport } from './export-import.js';
-import { initAmbientMusic, toggleAmbient } from './ambient-music.js';
+import { toggleAmbient } from './ambient-music.js';
 
 // --- Inisialisasi Aplikasi ---
 async function boot() {
@@ -51,33 +51,39 @@ async function boot() {
     });
   }
 
-  // 7. Dismiss boot screen + play notification sound
-  //    Delay agar semua boot lines selesai ditampilkan (7 lines × 0.45s = ~3.15s)
+  // 7. Boot screen: Click to Initialize
+  //    User harus klik dulu agar browser mengizinkan audio autoplay.
   const bootScreen = document.getElementById('boot-screen');
   if (bootScreen) {
-    setTimeout(() => {
-      // Play boot notification sound
+    bootScreen.addEventListener('click', () => {
+      // Sudah di-klik? Skip
+      if (!bootScreen.classList.contains('boot-waiting')) return;
+
+      // Hapus waiting state → boot lines muncul dengan animasi
+      bootScreen.classList.remove('boot-waiting');
+
+      // LANGSUNG play notification sound (user sudah interact)
       try {
         const bootSound = new Audio('/audio/notification-process-complete-slava-pogorelsky-1-00-03.mp3');
-        bootSound.volume = 0.4;
-        bootSound.play().catch(() => {}); // Ignore jika browser block autoplay
+        bootSound.volume = 0.5;
+        bootSound.play();
       } catch (e) { /* ignore */ }
 
-      bootScreen.classList.add('fade-out');
-      setTimeout(() => bootScreen.remove(), 800);
-    }, 3500);
+      // Setelah boot sequence selesai (7 lines × 0.25s ≈ 1.75s) → fade out + start ambient
+      setTimeout(() => {
+        bootScreen.classList.add('fade-out');
+
+        // Start ambient music LANGSUNG saat masuk halaman utama
+        const musicBtn = document.getElementById('btn-music-toggle');
+        toggleAmbient(); // Start playing
+        if (musicBtn) musicBtn.classList.add('active');
+
+        setTimeout(() => bootScreen.remove(), 800);
+      }, 2000);
+    });
   }
 
-  // 8. Init Export/Import backup
-  const btnExport = document.getElementById('btn-export');
-  if (btnExport) btnExport.addEventListener('click', downloadBackup);
-
-  const inputImport = document.getElementById('input-import');
-  if (inputImport) inputImport.addEventListener('change', handleImport);
-
-  // 9. Init ambient music (autoplay setelah klik pertama)
-  initAmbientMusic();
-
+  // 8. Music toggle button
   const musicBtn = document.getElementById('btn-music-toggle');
   if (musicBtn) {
     musicBtn.addEventListener('click', () => {
@@ -85,6 +91,13 @@ async function boot() {
       musicBtn.classList.toggle('active', playing);
     });
   }
+
+  // 9. Init Export/Import backup
+  const btnExport = document.getElementById('btn-export');
+  if (btnExport) btnExport.addEventListener('click', downloadBackup);
+
+  const inputImport = document.getElementById('input-import');
+  if (inputImport) inputImport.addEventListener('change', handleImport);
 
   console.log('🌐 Vibe Code Monitor initialized');
 }
