@@ -24,16 +24,24 @@ async function boot() {
   initNotifications();
 
   // 2. Init Three.js Globe
-  //    Container: div#canvas-container di index.html
   const container = document.getElementById('canvas-container');
   const globe = initGlobe(container);
 
-  // 3. Init UI
-  //    Pass globe.updateVisuals sebagai callback agar UI bisa trigger update globe
-  //    saat data akun berubah (add/edit/delete)
+  // 3. Init UI (async: fetch data dari Supabase)
   await initUI(globe.updateVisuals);
 
-  // Log untuk debugging
+  // 4. Dismiss boot screen
+  //    Delay agar semua boot lines selesai ditampilkan (7 lines × 0.45s = ~3.15s)
+  //    Tambah sedikit buffer agar user bisa baca line terakhir
+  const bootScreen = document.getElementById('boot-screen');
+  if (bootScreen) {
+    setTimeout(() => {
+      bootScreen.classList.add('fade-out');
+      // Hapus dari DOM setelah fade animation selesai (0.8s)
+      setTimeout(() => bootScreen.remove(), 800);
+    }, 3500);
+  }
+
   console.log('🌐 Vibe Code Monitor initialized');
 }
 

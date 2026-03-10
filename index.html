@@ -11,6 +11,22 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>" />
   </head>
   <body>
+    <!-- CRT Scanline Overlay -->
+    <div id="crt-overlay"></div>
+
+    <!-- Boot Sequence Screen -->
+    <div id="boot-screen">
+      <div class="boot-terminal">
+        <div class="boot-line" style="--delay:0">Vibe Code Monitor v2.0</div>
+        <div class="boot-line" style="--delay:1">================================</div>
+        <div class="boot-line" style="--delay:2">> initializing system<span class="boot-dots">...</span></div>
+        <div class="boot-line" style="--delay:3">> connecting to database<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
+        <div class="boot-line" style="--delay:4">> loading account data<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
+        <div class="boot-line" style="--delay:5">> rendering globe<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
+        <div class="boot-line" style="--delay:6">> system ready. welcome, operator.<span class="boot-cursor">█</span></div>
+      </div>
+    </div>
+
     <!-- Three.js Canvas Container -->
     <div id="canvas-container"></div>
 
@@ -78,8 +94,42 @@
         <button class="filter-btn" data-filter="available">ACTIVE</button>
         <button class="filter-btn" data-filter="limited">LIMITED</button>
       </div>
+      <!-- Search + Sort Bar -->
+      <div class="panel-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input type="text" id="search-input" placeholder="search accounts..." autocomplete="off" />
+        </div>
+        <select id="sort-select" class="sort-select" title="Sort accounts">
+          <option value="default">↕ Default</option>
+          <option value="name-asc">A → Z</option>
+          <option value="name-desc">Z → A</option>
+          <option value="time-asc">⏱ Soonest</option>
+          <option value="status">● Active first</option>
+        </select>
+        <button id="btn-sound-toggle" class="btn-icon sound-toggle" title="Toggle Sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+        </button>
+      </div>
       <div class="panel-body" id="account-list">
+        <!-- Matrix Rain Canvas (background) -->
+        <canvas id="matrix-canvas"></canvas>
         <!-- Account cards will be injected by JS -->
+      </div>
+      <!-- Activity Log Console -->
+      <div id="activity-log" class="activity-log collapsed">
+        <button id="btn-toggle-log" class="log-toggle-btn">
+          <span class="log-toggle-icon">▸</span>
+          <span>// terminal_log</span>
+          <span id="log-badge" class="log-badge hidden">0</span>
+        </button>
+        <div id="log-list" class="log-list"></div>
       </div>
     </aside>
 

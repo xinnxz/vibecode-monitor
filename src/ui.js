@@ -36,7 +36,9 @@ let accountListEl,
   inputDays,
   inputHours,
   inputMinutes,
-  inputId;
+  inputId,
+  searchInput,
+  sortSelect;
 
 // Fungsi callback untuk update globe visuals
 let onDataChange = null;
@@ -46,6 +48,13 @@ let pendingDeleteId = null;
 
 // Filter state: 'all' | 'available' | 'limited'
 let currentFilter = 'all';
+
+// Search state
+let searchTerm = '';
+let searchDebounceTimer = null;
+
+// Sort state: 'default' | 'name-asc' | 'name-desc' | 'time-asc' | 'status'
+let currentSort = 'default';
 
 // Set untuk track akun yang sudah pernah di-notify (cegah duplikat)
 const notifiedIds = new Set();
@@ -77,6 +86,8 @@ export async function initUI(updateGlobeVisuals) {
   inputHours = document.getElementById('input-hours');
   inputMinutes = document.getElementById('input-minutes');
   inputId = document.getElementById('input-id');
+  searchInput = document.getElementById('search-input');
+  sortSelect = document.getElementById('sort-select');
 
   // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
   // OrbitControls memasang wheel listener di renderer.domElement;
@@ -141,6 +152,25 @@ export async function initUI(updateGlobeVisuals) {
     });
   });
 
+  // --- Search (debounced 200ms) ---
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        searchTerm = searchInput.value.trim().toLowerCase();
+        renderAccountList(getAccounts());
+      }, 200);
+    });
+  }
+
+  // --- Sort ---
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      currentSort = sortSelect.value;
+      renderAccountList(getAccounts());
+    });
+  }
+
   // Listen ke perubahan data dari accounts module
   onChange((accounts) => {
     renderAccountList(accounts);
@@ -198,7 +228,9 @@ function renderStats() {
 }
 
 /**
- * Render daftar akun ke sidebar panel, dengan filter applied.
+ * Render daftar akun ke sidebar panel, dengan filter + search + sort applied.
+ * 
+ * Pipeline: accounts → filter by status → filter by search → sort → render
  * 
  * @param {Array} accounts
  */
@@ -216,21 +248,30 @@ function renderAccountList(accounts) {
     return;
   }
 
-  // Apply filter
-  const filtered = currentFilter === 'all'
-    ? accounts
+  // 1. Filter by status
+  let result = currentFilter === 'all'
+    ? [...accounts]
     : accounts.filter((a) => a.status === currentFilter);
 
-  if (filtered.length === 0) {
+  // 2. Filter by search term
+  if (searchTerm) {
+    result = result.filter((a) => a.name.toLowerCase().includes(searchTerm));
+  }
+
+  // 3. Sort
+  result = sortAccounts(result, currentSort);
+
+  if (result.length === 0) {
+    const context = searchTerm ? `matching "${searchTerm}"` : currentFilter;
     accountListEl.innerHTML = `
       <div class="empty-state">
-        <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)">// no ${currentFilter} accounts found</p>
+        <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted)">// no accounts found ${context}</p>
       </div>
     `;
     return;
   }
 
-  accountListEl.innerHTML = filtered
+  accountListEl.innerHTML = result
     .map(
       (account, index) => {
         const isAvailable = account.status === 'available';
@@ -539,6 +580,57 @@ function onDragEnd() {
 }
 
 // ============================================================
+// SORT LOGIC
+// ============================================================
+
+/**
+ * Sort akun berdasarkan mode yang dipilih.
+ * 
+ * Modes:
+ * - 'default': urutan dari database (created_at)
+ * - 'name-asc': nama A → Z
+ * - 'name-desc': nama Z → A
+ * - 'time-asc': soonest ready (deadline paling dekat di atas)
+ * - 'status': available/active first, limited di bawah
+ * 
+ * @param {Array} accounts
+ * @param {string} mode
+ * @returns {Array} Sorted copy
+ */
+function sortAccounts(accounts, mode) {
+  if (mode === 'default') return accounts;
+
+  const sorted = [...accounts];
+
+  switch (mode) {
+    case 'name-asc':
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case 'name-desc':
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+      break;
+    case 'time-asc':
+      // Akun dengan deadline paling dekat di atas.
+      // Akun tanpa deadline = di bawah (Infinity).
+      sorted.sort((a, b) => {
+        const aTime = a.refreshDeadline ? new Date(a.refreshDeadline).getTime() : Infinity;
+        const bTime = b.refreshDeadline ? new Date(b.refreshDeadline).getTime() : Infinity;
+        return aTime - bTime;
+      });
+      break;
+    case 'status':
+      // Available/active first
+      sorted.sort((a, b) => {
+        if (a.status === b.status) return 0;
+        return a.status === 'available' ? -1 : 1;
+      });
+      break;
+  }
+
+  return sorted;
+}
+
+// ============================================================
 // COUNTDOWN TIMER (via requestAnimationFrame)
 // ============================================================
 
@@ -627,7 +719,7 @@ function updateCountdowns() {
       if (el.innerHTML !== readyHtml) {
         el.innerHTML = readyHtml;
 
-        // Trigger notifikasi
+        // Trigger notifikasi + auto-status toggle
         const card = el.closest('.account-card');
         const accountId = card?.dataset.accountId;
 
@@ -638,6 +730,14 @@ function updateCountdowns() {
 
           // Kirim notification (browser + notification center)
           sendNotification(accountName);
+
+          // AUTO-STATUS TOGGLE:
+          // Jika akun masih "limited", otomatis ubah ke "available"
+          const accounts = getAccounts();
+          const account = accounts.find((a) => a.id === accountId);
+          if (account && account.status === 'limited') {
+            editAccount(accountId, { status: 'available' });
+          }
         }
       }
       return;
