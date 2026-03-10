@@ -1415,6 +1415,17 @@ html, body {
   color: var(--text-primary);
 }
 
+/* ---------- Music Toggle ---------- */
+.music-toggle.active {
+  color: var(--accent-cyan);
+  animation: music-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes music-pulse {
+  0%, 100% { filter: drop-shadow(0 0 3px var(--accent-cyan)); }
+  50% { filter: drop-shadow(0 0 8px var(--accent-cyan)); }
+}
+
 /* ---------- Matrix Rain Canvas ---------- */
 #matrix-canvas {
   position: absolute;

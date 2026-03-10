@@ -21,6 +21,7 @@ import { initActivityLog } from './activity-log.js';
 import { initMatrixRain } from './matrix-rain.js';
 import { toggleSound } from './sounds.js';
 import { downloadBackup, handleImport } from './export-import.js';
+import { initAmbientMusic, toggleAmbient } from './ambient-music.js';
 
 // --- Inisialisasi Aplikasi ---
 async function boot() {
@@ -50,11 +51,18 @@ async function boot() {
     });
   }
 
-  // 7. Dismiss boot screen
+  // 7. Dismiss boot screen + play notification sound
   //    Delay agar semua boot lines selesai ditampilkan (7 lines × 0.45s = ~3.15s)
   const bootScreen = document.getElementById('boot-screen');
   if (bootScreen) {
     setTimeout(() => {
+      // Play boot notification sound
+      try {
+        const bootSound = new Audio('/audio/notification-process-complete-slava-pogorelsky-1-00-03.mp3');
+        bootSound.volume = 0.4;
+        bootSound.play().catch(() => {}); // Ignore jika browser block autoplay
+      } catch (e) { /* ignore */ }
+
       bootScreen.classList.add('fade-out');
       setTimeout(() => bootScreen.remove(), 800);
     }, 3500);
@@ -66,6 +74,17 @@ async function boot() {
 
   const inputImport = document.getElementById('input-import');
   if (inputImport) inputImport.addEventListener('change', handleImport);
+
+  // 9. Init ambient music (autoplay setelah klik pertama)
+  initAmbientMusic();
+
+  const musicBtn = document.getElementById('btn-music-toggle');
+  if (musicBtn) {
+    musicBtn.addEventListener('click', () => {
+      const playing = toggleAmbient();
+      musicBtn.classList.toggle('active', playing);
+    });
+  }
 
   console.log('🌐 Vibe Code Monitor initialized');
 }
