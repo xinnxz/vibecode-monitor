@@ -253,13 +253,15 @@ html, body {
   -webkit-backdrop-filter: blur(24px);
   border-left: 1px solid var(--border-glass);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px 16px;
+  padding: 16px 24px 12px;
   border-bottom: 1px solid rgba(56, 189, 248, 0.1);
   flex-shrink: 0;
 }
@@ -291,9 +293,10 @@ html, body {
 .panel-filters {
   display: flex;
   gap: 4px;
-  padding: 10px 24px;
+  padding: 8px 24px;
   border-bottom: 1px solid rgba(56, 189, 248, 0.08);
   background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 .filter-btn {
@@ -327,11 +330,8 @@ html, body {
 }
 
 .panel-body {
-  position: absolute;
-  top: 144px;  /* header(64) + filters(40) + toolbar(40) */
-  left: 0;
-  right: 0;
-  bottom: 32px; /* space for activity log toggle */
+  flex: 1;
+  min-height: 0;        /* Required for flex children to scroll properly */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px 24px;
@@ -1368,9 +1368,20 @@ html, body {
 .panel-toolbar {
   display: flex;
   gap: 6px;
-  padding: 8px 24px;
+  padding: 8px 24px 4px;
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+/* ---------- Action Buttons Bar ---------- */
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 24px 8px;
   border-bottom: 1px solid rgba(56, 189, 248, 0.06);
   background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 .search-box {
@@ -1459,8 +1470,9 @@ html, body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
   opacity: 1;
+  border-radius: inherit;
 }
 
 /* Ensure cards are above the matrix canvas */

@@ -56,6 +56,8 @@
 
     <!-- Side Panel -->
     <aside id="side-panel" class="panel">
+      <!-- Matrix Rain Canvas (background) -->
+      <canvas id="matrix-canvas"></canvas>
       <div class="panel-header">
         <h2>Accounts</h2>
         <div class="panel-header-actions">
@@ -111,6 +113,10 @@
           <option value="time-asc">⏱ Soonest</option>
           <option value="status">● Active first</option>
         </select>
+      </div>
+      
+      <!-- Action Buttons Bar -->
+      <div class="panel-actions">
         <button id="btn-sound-toggle" class="btn-icon sound-toggle" title="Toggle Sound">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -155,8 +161,6 @@
         </button>
       </div>
       <div class="panel-body" id="account-list">
-        <!-- Matrix Rain Canvas (background) -->
-        <canvas id="matrix-canvas"></canvas>
         <!-- Account cards will be injected by JS -->
       </div>
       <!-- Floating Bulk Action Bar -->
