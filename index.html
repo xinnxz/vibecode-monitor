@@ -235,7 +235,14 @@ NET: UPLINK_SECURE
               </select>
             </div>
             <div class="form-group form-time-group">
-              <label for="input-days">refresh_timer</label>
+              <label for="input-days">refresh_timer
+                <div class="timer-presets">
+                  <button type="button" class="btn-preset" data-h="24">Cursor (24h)</button>
+                  <button type="button" class="btn-preset" data-h="4">Claude (4h)</button>
+                  <button type="button" class="btn-preset" data-h="3">ChatGPT (3h)</button>
+                  <button type="button" class="btn-preset" data-h="1">Gemini (1h)</button>
+                </div>
+              </label>
               <div class="duration-inputs">
                 <div class="duration-field">
                   <input type="number" id="input-days" min="0" max="30" placeholder="0" />

@@ -137,6 +137,9 @@ export async function initUI(updateGlobeVisuals) {
   inputTelegramToken = document.getElementById('input-telegram-token');
   inputTelegramChatId = document.getElementById('input-telegram-chatid');
 
+  // Setup click listeners untuk Timer Presets di Modal
+  setupTimerPresets();
+
   // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
   // OrbitControls memasang wheel listener di renderer.domElement;
   // kita stop propagation agar wheel di panel tidak bocor ke canvas.
@@ -387,6 +390,13 @@ function renderAccountList(accounts) {
           <span>${statusLabel}</span>
         </div>
         <div class="card-header-actions">
+          <button class="btn-icon copy" title="Copy Credentials" data-action="copy" data-id="${account.id}" data-name="${escapeHtml(account.name)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="copy-tooltip">Copied!</span>
+          </button>
           <button class="btn-icon history" title="History Log" data-action="history" data-id="${account.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle>
@@ -989,6 +999,32 @@ function handleCardAction(e) {
     openConfirm(id);
   } else if (action === 'history') {
     openHistoryModal(id);
+  } else if (action === 'copy') {
+    const name = btn.dataset.name;
+    copyToClipboard(name, btn);
+  }
+}
+
+/**
+ * Copy text ke clipboard dan tampilkan animasi "Copied!"
+ */
+async function copyToClipboard(text, btnElement) {
+  try {
+    await navigator.clipboard.writeText(text);
+    
+    // Tampilkan tooltip
+    const tooltip = btnElement.querySelector('.copy-tooltip');
+    if (tooltip) {
+      tooltip.classList.add('show');
+      setTimeout(() => {
+        tooltip.classList.remove('show');
+      }, 1500);
+    }
+    
+    playClick(); // Mainkan sound effect kecil
+  } catch (err) {
+    console.error('Failed to copy tekst:', err);
+    addLog('SYSTEM', 'Copy to clipboard failed');
   }
 }
 
@@ -1019,6 +1055,30 @@ function openModal(editId = null) {
 
   modalOverlay.classList.remove('hidden');
   setTimeout(() => inputName.focus(), 100);
+}
+
+/**
+ * Setup event delegation untuk tombol Timer Presets di modal
+ */
+function setupTimerPresets() {
+  const formTimeGroup = document.querySelector('.form-time-group');
+  if (!formTimeGroup) return;
+
+  formTimeGroup.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-preset')) {
+      const hoursToAdd = parseInt(e.target.dataset.h, 10);
+      if (isNaN(hoursToAdd)) return;
+
+      const days = Math.floor(hoursToAdd / 24);
+      const hours = hoursToAdd % 24;
+
+      inputDays.value = days > 0 ? days : '';
+      inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : ''); // Set 0 if days > 0 but hours is 0 (e.g. 24h = 1d 0h)
+      inputMinutes.value = '';
+      
+      playClick();
+    }
+  });
 }
 
 function closeModal() {

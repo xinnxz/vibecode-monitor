@@ -598,11 +598,52 @@ html, body {
 }
 
 .card-notes svg {
-  color: var(--accent-cyan);
-  opacity: 0.7;
   flex-shrink: 0;
-  margin-top: 2px;
+  opacity: 0.7;
 }
+
+/* --- Copy Button Tooltip --- */
+.btn-icon.copy {
+  position: relative;
+}
+
+.copy-tooltip {
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--accent-green);
+  color: #000;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(52, 211, 153, 0.3);
+}
+
+.copy-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 4px 4px 4px;
+  border-style: solid;
+  border-color: transparent transparent var(--accent-green) transparent;
+}
+
+.copy-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
 
 .card-notes .note-text {
   overflow: hidden;
@@ -914,6 +955,7 @@ html, body {
 .form-group label {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
@@ -931,19 +973,56 @@ html, body {
   opacity: 0.4;
 }
 
+/* --- Timer Presets --- */
+.timer-presets {
+  display: flex;
+  gap: 6px;
+  margin-left: auto; /* Push to the right */
+}
+
+.btn-preset {
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: var(--accent-cyan);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-transform: none; /* Override label uppercase */
+  letter-spacing: normal;
+}
+
+.btn-preset:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-preset:active {
+  transform: translateY(0);
+}
+
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 10px 14px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(56, 189, 248, 0.12);
-  border-radius: 2px;
+  border-radius: 4px;
   color: var(--text-primary);
   font-size: 13px;
   font-family: 'JetBrains Mono', monospace;
   outline: none;
   transition: all var(--transition-fast);
   letter-spacing: 0.02em;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
 .form-group input::placeholder {
@@ -1517,6 +1596,14 @@ html, body {
   border-color: rgba(56, 189, 248, 0.3);
   background: rgba(56, 189, 248, 0.03);
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.08);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.1);
 }
 
 .sort-select {
