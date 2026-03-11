@@ -102,8 +102,6 @@ function loadTextures() {
     label: loader.load(basePath + 'label.png'),
     redCircle: loader.load(basePath + 'redCircle.png'),
     moon: loader.load(basePath + 'moon.jpg'),
-    starmap: loader.load(basePath + 'starmap.jpg'),
-    galaxy: loader.load(basePath + 'galaxy.jpg'),
   };
 }
 
@@ -147,7 +145,6 @@ export function initGlobe(container) {
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
   if (textures.earth) textures.earth.anisotropy = maxAnisotropy;
   if (textures.moon) textures.moon.anisotropy = maxAnisotropy;
-  if (textures.galaxy) textures.galaxy.anisotropy = maxAnisotropy;
 
   // --- Controls ---
   controls = new OrbitControls(camera, renderer.domElement);
@@ -363,23 +360,153 @@ function createEarthAperture() {
 }
 
 // ============================================================
-// SPACE ENVIRONMENT (Galaxy, Moon, Stars)
+// SPACE ENVIRONMENT (Nebula, Moon, Stars)
 // ============================================================
 
+/**
+ * Generate a soft radial glow texture via Canvas.
+ * Used for nebula clouds and star particles.
+ */
+function createGlowTexture(color1, color2, size = 256) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const gradient = ctx.createRadialGradient(
+    size / 2, size / 2, 0,
+    size / 2, size / 2, size / 2
+  );
+  gradient.addColorStop(0, color1);
+  gradient.addColorStop(0.4, color2);
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * Create a cluster of nebula cloud particles.
+ */
+function createNebulaCloud(centerX, centerY, centerZ, color, count, spread, opacity) {
+  const positions = [];
+  const glowTex = createGlowTexture(
+    color.replace(')', ', 0.6)').replace('rgb', 'rgba'),
+    color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+    128
+  );
+
+  for (let i = 0; i < count; i++) {
+    positions.push(
+      centerX + (Math.random() - 0.5) * spread,
+      centerY + (Math.random() - 0.5) * spread,
+      centerZ + (Math.random() - 0.5) * spread
+    );
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: spread * 0.4,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: opacity,
+    map: glowTex,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    color: new THREE.Color(color),
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
 function createSpaceEnvironment() {
-  // 1. High-Quality Galaxy Background (Skybox)
+  // ============================
+  // 1. Dark Space Gradient Sphere (replaces broken galaxy skybox)
+  // ============================
+  const skyCanvas = document.createElement('canvas');
+  skyCanvas.width = 2048;
+  skyCanvas.height = 1024;
+  const skyCtx = skyCanvas.getContext('2d');
+
+  // Deep space gradient: dark blue-black with subtle color shifts
+  const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 1024);
+  skyGrad.addColorStop(0, '#020810');
+  skyGrad.addColorStop(0.3, '#0a0e1a');
+  skyGrad.addColorStop(0.5, '#0d1025');
+  skyGrad.addColorStop(0.7, '#0a0c18');
+  skyGrad.addColorStop(1, '#030612');
+  skyCtx.fillStyle = skyGrad;
+  skyCtx.fillRect(0, 0, 2048, 1024);
+
+  // Add subtle milky way band
+  skyCtx.save();
+  skyCtx.globalAlpha = 0.08;
+  skyCtx.translate(1024, 400);
+  skyCtx.rotate(-0.3);
+  const bandGrad = skyCtx.createLinearGradient(0, -80, 0, 80);
+  bandGrad.addColorStop(0, 'transparent');
+  bandGrad.addColorStop(0.3, '#334488');
+  bandGrad.addColorStop(0.5, '#556699');
+  bandGrad.addColorStop(0.7, '#334488');
+  bandGrad.addColorStop(1, 'transparent');
+  skyCtx.fillStyle = bandGrad;
+  skyCtx.fillRect(-1200, -80, 2400, 160);
+  skyCtx.restore();
+
+  // Sprinkle tiny dot stars on the skybox canvas itself
+  skyCtx.fillStyle = '#ffffff';
+  for (let i = 0; i < 2000; i++) {
+    const sx = Math.random() * 2048;
+    const sy = Math.random() * 1024;
+    const sr = Math.random() * 1.2;
+    skyCtx.globalAlpha = Math.random() * 0.6 + 0.2;
+    skyCtx.beginPath();
+    skyCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+    skyCtx.fill();
+  }
+  skyCtx.globalAlpha = 1;
+
+  const skyTex = new THREE.CanvasTexture(skyCanvas);
   const skyboxGeo = new THREE.SphereGeometry(1500, 64, 64);
   const skyboxMat = new THREE.MeshBasicMaterial({
-    map: textures.galaxy,
+    map: skyTex,
     side: THREE.BackSide,
-    color: 0xaaaaaa, // Dim slightly
-    transparent: true,
-    opacity: 0.6
   });
   spaceBackground = new THREE.Mesh(skyboxGeo, skyboxMat);
   scene.add(spaceBackground);
 
-  // 2. Realistic Moon
+  // ============================
+  // 2. Nebula Clouds (procedural)
+  // ============================
+  // Purple nebula cluster (upper-left)
+  const nebula1 = createNebulaCloud(-500, 300, -600, 'rgb(120, 60, 180)', 30, 300, 0.15);
+  scene.add(nebula1);
+
+  // Cyan nebula cluster (right side)
+  const nebula2 = createNebulaCloud(600, -200, -400, 'rgb(40, 160, 220)', 25, 250, 0.12);
+  scene.add(nebula2);
+
+  // Red/orange nebula (behind earth, far)
+  const nebula3 = createNebulaCloud(0, 100, -800, 'rgb(200, 80, 60)', 20, 350, 0.08);
+  scene.add(nebula3);
+
+  // Bright blue star-forming region (lower-right)
+  const nebula4 = createNebulaCloud(400, -400, -500, 'rgb(60, 120, 255)', 15, 200, 0.1);
+  scene.add(nebula4);
+
+  // Green/teal subtle wisps (upper-right)
+  const nebula5 = createNebulaCloud(300, 500, -700, 'rgb(40, 200, 150)', 18, 280, 0.07);
+  scene.add(nebula5);
+
+  // ============================
+  // 3. Realistic Moon
+  // ============================
   const R = CONFIG.earth.radius;
   const moonGeo = new THREE.SphereGeometry(R * 0.25, 32, 32);
   const moonMat = new THREE.MeshStandardMaterial({
@@ -388,58 +515,58 @@ function createSpaceEnvironment() {
     metalness: 0.1
   });
   moonMesh = new THREE.Mesh(moonGeo, moonMat);
-  
-  // Position the moon
   moonMesh.position.set(160, 60, -100);
-  
-  // Add lighting for the moon
+
   const moonLight = new THREE.PointLight(0xffffff, 2, 800);
   moonLight.position.set(250, 100, 100);
   scene.add(moonLight);
 
-  // Add subtle ambient light to keep things from being pure black
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
   scene.add(ambientLight);
-
   scene.add(moonMesh);
 
-  // 3. Dynamic Stars
+  // ============================
+  // 4. Dynamic Stars (multi-color temperature)
+  // ============================
+  const starGlowTex = createGlowTexture(
+    'rgba(255,255,255,0.9)',
+    'rgba(200,220,255,0.2)',
+    64
+  );
+
   const vertices = [];
-  const sizes = [];
-  const colors = [];
-  const startColor = new THREE.Color();
-  
+  const starColors = [];
+  const c = new THREE.Color();
+
   for (let i = 0; i < 3000; i++) {
     const x = 2000 * Math.random() - 1000;
     const y = 2000 * Math.random() - 1000;
     const z = 2000 * Math.random() - 1000;
-    
-    // Create a hollow sphere so stars don't clip inside the earth
+
+    // Don't place stars inside the earth area
     if (Math.abs(x) < 200 && Math.abs(y) < 200 && Math.abs(z) < 200) continue;
-    
+
     vertices.push(x, y, z);
-    sizes.push(Math.random() * 2 + 0.5);
-    
-    // Varying star temperatures (blue, white, orange)
+
     const temp = Math.random();
-    if (temp > 0.8) startColor.setHex(0xaabfff); // Blueish
-    else if (temp > 0.4) startColor.setHex(0xffffff); // White
-    else startColor.setHex(0xffdfb3); // Orangeish
-    
-    colors.push(startColor.r, startColor.g, startColor.b);
+    if (temp > 0.85) c.setHex(0xaabfff);      // Hot blue
+    else if (temp > 0.5) c.setHex(0xffffff);   // White
+    else if (temp > 0.2) c.setHex(0xffe8c8);   // Warm yellow
+    else c.setHex(0xffcfa0);                    // Orange
+
+    starColors.push(c.r, c.g, c.b);
   }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(sizes), 1));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(starColors), 3));
 
   const mat = new THREE.PointsMaterial({
     size: 2.5,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.8,
-    map: textures.aperture, // Use soft glowing circle
+    opacity: 0.85,
+    map: starGlowTex,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     vertexColors: true
