@@ -5,7 +5,7 @@
 /* ---------- CSS Variables (Design Tokens) ---------- */
 :root {
   /* Colors */
-  --bg-primary: #0a0e17;
+  --bg-primary: #010204;
   --bg-secondary: #111827;
   --bg-card: rgba(17, 24, 39, 0.6);
   --bg-glass: rgba(17, 24, 39, 0.45);

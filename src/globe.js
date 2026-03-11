@@ -120,7 +120,7 @@ export function initGlobe(container) {
 
   // --- Scene ---
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0a0e17, 0.002);
+  // NOTE: Removed FogExp2 — it was making ALL distant objects (nebula, stars, moon) invisible
 
   // --- Camera ---
   const aspect = getAspect();
@@ -131,9 +131,10 @@ export function initGlobe(container) {
   // --- Renderer ---
   renderer = new THREE.WebGLRenderer({
     antialias: true,
-    alpha: true,
+    alpha: false,
     powerPreference: 'high-performance',
   });
+  renderer.setClearColor(0x010204, 1);
   renderer.setSize(getWidth(), window.innerHeight);
   // Reverted to 2 for crisp, high-resolution display
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -152,7 +153,7 @@ export function initGlobe(container) {
   controls.dampingFactor = 0.05;
   controls.enablePan = false;
   controls.minDistance = 80;
-  controls.maxDistance = 300;
+  controls.maxDistance = 350;
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.5;
 
@@ -390,82 +391,138 @@ function createGlowTexture(color1, color2, size = 256) {
 }
 
 /**
- * Create a cluster of nebula cloud particles.
+ * Create a single nebula sprite using a real NASA image texture.
  */
-function createNebulaCloud(centerX, centerY, centerZ, color, count, spread, opacity) {
-  const positions = [];
-  const glowTex = createGlowTexture(
-    color.replace(')', ', 0.6)').replace('rgb', 'rgba'),
-    color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
-    128
-  );
-
-  for (let i = 0; i < count; i++) {
-    positions.push(
-      centerX + (Math.random() - 0.5) * spread,
-      centerY + (Math.random() - 0.5) * spread,
-      centerZ + (Math.random() - 0.5) * spread
-    );
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: spread * 0.4,
-    sizeAttenuation: true,
+function createNebulaSprite(texturePath, x, y, z, size, opacity) {
+  const loader = new THREE.TextureLoader();
+  const tex = loader.load(texturePath);
+  
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
     transparent: true,
     opacity: opacity,
-    map: glowTex,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    color: new THREE.Color(color),
+    fog: false,
   });
 
-  return new THREE.Points(geo, mat);
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(size, size, 1);
+  return sprite;
 }
 
 function createSpaceEnvironment() {
   // ============================
-  // 1. Dark Space Gradient Sphere (replaces broken galaxy skybox)
+  // 1. Dark Space with painted nebulae + stars (all on one canvas)
   // ============================
   const skyCanvas = document.createElement('canvas');
   skyCanvas.width = 2048;
   skyCanvas.height = 1024;
   const skyCtx = skyCanvas.getContext('2d');
 
-  // Deep space gradient: dark blue-black with subtle color shifts
+  // Base: near pure black deep space
   const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 1024);
-  skyGrad.addColorStop(0, '#020810');
-  skyGrad.addColorStop(0.3, '#0a0e1a');
-  skyGrad.addColorStop(0.5, '#0d1025');
-  skyGrad.addColorStop(0.7, '#0a0c18');
-  skyGrad.addColorStop(1, '#030612');
+  skyGrad.addColorStop(0, '#000102');
+  skyGrad.addColorStop(0.3, '#010204');
+  skyGrad.addColorStop(0.5, '#020306');
+  skyGrad.addColorStop(0.7, '#010204');
+  skyGrad.addColorStop(1, '#000102');
   skyCtx.fillStyle = skyGrad;
   skyCtx.fillRect(0, 0, 2048, 1024);
 
-  // Add subtle milky way band
+  // Subtle milky way band (wide, faint diffuse glow)
   skyCtx.save();
-  skyCtx.globalAlpha = 0.08;
-  skyCtx.translate(1024, 400);
-  skyCtx.rotate(-0.3);
-  const bandGrad = skyCtx.createLinearGradient(0, -80, 0, 80);
+  skyCtx.globalAlpha = 0.04;
+  skyCtx.translate(1024, 450);
+  skyCtx.rotate(-0.15);
+  const bandGrad = skyCtx.createLinearGradient(0, -150, 0, 150);
   bandGrad.addColorStop(0, 'transparent');
-  bandGrad.addColorStop(0.3, '#334488');
-  bandGrad.addColorStop(0.5, '#556699');
-  bandGrad.addColorStop(0.7, '#334488');
+  bandGrad.addColorStop(0.15, '#1a2244');
+  bandGrad.addColorStop(0.3, '#2a3866');
+  bandGrad.addColorStop(0.5, '#3a4888');
+  bandGrad.addColorStop(0.7, '#2a3866');
+  bandGrad.addColorStop(0.85, '#1a2244');
   bandGrad.addColorStop(1, 'transparent');
   skyCtx.fillStyle = bandGrad;
-  skyCtx.fillRect(-1200, -80, 2400, 160);
+  skyCtx.fillRect(-1200, -150, 2400, 300);
   skyCtx.restore();
 
-  // Sprinkle tiny dot stars on the skybox canvas itself
+  // --- Paint realistic nebulae directly onto canvas ---
+  // Each nebula is built from multiple overlapping radial gradients
+  // with different colors creating complex, organic shapes.
+
+  function paintNebula(cx, cy, layers) {
+    layers.forEach(layer => {
+      const { ox, oy, rx, ry, color, alpha } = layer;
+      skyCtx.save();
+      skyCtx.globalAlpha = alpha;
+      skyCtx.translate(cx + ox, cy + oy);
+      // Scale to create elliptical shapes (not perfect circles)
+      skyCtx.scale(1, ry / rx);
+      const g = skyCtx.createRadialGradient(0, 0, 0, 0, 0, rx);
+      g.addColorStop(0, color);
+      g.addColorStop(0.3, color);
+      g.addColorStop(0.7, color.replace(/[\d.]+\)$/, '0.3)'));
+      g.addColorStop(1, 'transparent');
+      skyCtx.fillStyle = g;
+      skyCtx.fillRect(-rx, -rx, rx * 2, rx * 2);
+      skyCtx.restore();
+    });
+  }
+
+  // Orion-like nebula — left side (blue-purple)
+  paintNebula(350, 300, [
+    { ox: 0, oy: 0, rx: 140, ry: 100, color: 'rgba(80, 50, 160, 0.06)', alpha: 1 },
+    { ox: 30, oy: -20, rx: 100, ry: 80, color: 'rgba(60, 80, 200, 0.05)', alpha: 1 },
+    { ox: -20, oy: 15, rx: 80, ry: 110, color: 'rgba(120, 40, 180, 0.04)', alpha: 1 },
+    { ox: 10, oy: 5, rx: 50, ry: 40, color: 'rgba(150, 100, 255, 0.07)', alpha: 1 },
+  ]);
+
+  // Carina-like nebula — right side (warm red-orange)
+  paintNebula(1500, 650, [
+    { ox: 0, oy: 0, rx: 160, ry: 120, color: 'rgba(180, 50, 30, 0.05)', alpha: 1 },
+    { ox: -30, oy: 20, rx: 120, ry: 90, color: 'rgba(200, 80, 20, 0.04)', alpha: 1 },
+    { ox: 25, oy: -15, rx: 90, ry: 130, color: 'rgba(160, 40, 60, 0.035)', alpha: 1 },
+    { ox: 5, oy: 0, rx: 60, ry: 50, color: 'rgba(255, 120, 50, 0.06)', alpha: 1 },
+  ]);
+
+  // Eagle-like nebula — upper right (green-teal)
+  paintNebula(1700, 250, [
+    { ox: 0, oy: 0, rx: 120, ry: 90, color: 'rgba(30, 120, 80, 0.04)', alpha: 1 },
+    { ox: 20, oy: -10, rx: 90, ry: 70, color: 'rgba(40, 160, 120, 0.035)', alpha: 1 },
+    { ox: -15, oy: 15, rx: 70, ry: 100, color: 'rgba(50, 200, 150, 0.03)', alpha: 1 },
+  ]);
+
+  // Small blue emission nebula — bottom center
+  paintNebula(900, 850, [
+    { ox: 0, oy: 0, rx: 100, ry: 80, color: 'rgba(30, 80, 200, 0.04)', alpha: 1 },
+    { ox: 15, oy: -10, rx: 60, ry: 50, color: 'rgba(60, 120, 255, 0.05)', alpha: 1 },
+  ]);
+
+  // Faint golden wisp — center left
+  paintNebula(600, 500, [
+    { ox: 0, oy: 0, rx: 110, ry: 70, color: 'rgba(200, 150, 50, 0.03)', alpha: 1 },
+    { ox: 20, oy: 10, rx: 70, ry: 50, color: 'rgba(220, 180, 80, 0.025)', alpha: 1 },
+  ]);
+
+  // --- Small twinkle stars ---
   skyCtx.fillStyle = '#ffffff';
-  for (let i = 0; i < 2000; i++) {
+  for (let i = 0; i < 3000; i++) {
     const sx = Math.random() * 2048;
     const sy = Math.random() * 1024;
-    const sr = Math.random() * 1.2;
+    const sr = Math.random() * 0.8 + 0.1;
     skyCtx.globalAlpha = Math.random() * 0.6 + 0.2;
+    skyCtx.beginPath();
+    skyCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+    skyCtx.fill();
+  }
+  // Brighter accent stars (fewer, larger)
+  for (let i = 0; i < 80; i++) {
+    const sx = Math.random() * 2048;
+    const sy = Math.random() * 1024;
+    const sr = Math.random() * 1.5 + 0.5;
+    skyCtx.globalAlpha = Math.random() * 0.2 + 0.2;
     skyCtx.beginPath();
     skyCtx.arc(sx, sy, sr, 0, Math.PI * 2);
     skyCtx.fill();
@@ -480,29 +537,6 @@ function createSpaceEnvironment() {
   });
   spaceBackground = new THREE.Mesh(skyboxGeo, skyboxMat);
   scene.add(spaceBackground);
-
-  // ============================
-  // 2. Nebula Clouds (procedural)
-  // ============================
-  // Purple nebula cluster (upper-left)
-  const nebula1 = createNebulaCloud(-500, 300, -600, 'rgb(120, 60, 180)', 30, 300, 0.15);
-  scene.add(nebula1);
-
-  // Cyan nebula cluster (right side)
-  const nebula2 = createNebulaCloud(600, -200, -400, 'rgb(40, 160, 220)', 25, 250, 0.12);
-  scene.add(nebula2);
-
-  // Red/orange nebula (behind earth, far)
-  const nebula3 = createNebulaCloud(0, 100, -800, 'rgb(200, 80, 60)', 20, 350, 0.08);
-  scene.add(nebula3);
-
-  // Bright blue star-forming region (lower-right)
-  const nebula4 = createNebulaCloud(400, -400, -500, 'rgb(60, 120, 255)', 15, 200, 0.1);
-  scene.add(nebula4);
-
-  // Green/teal subtle wisps (upper-right)
-  const nebula5 = createNebulaCloud(300, 500, -700, 'rgb(40, 200, 150)', 18, 280, 0.07);
-  scene.add(nebula5);
 
   // ============================
   // 3. Realistic Moon
@@ -538,7 +572,7 @@ function createSpaceEnvironment() {
   const starColors = [];
   const c = new THREE.Color();
 
-  for (let i = 0; i < 3000; i++) {
+  for (let i = 0; i < 1500; i++) {
     const x = 2000 * Math.random() - 1000;
     const y = 2000 * Math.random() - 1000;
     const z = 2000 * Math.random() - 1000;
@@ -562,14 +596,15 @@ function createSpaceEnvironment() {
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(starColors), 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 2.5,
+    size: 0.4,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.5,
     map: starGlowTex,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    vertexColors: true
+    vertexColors: true,
+    fog: false,
   });
 
   starPoints = new THREE.Points(geo, mat);
