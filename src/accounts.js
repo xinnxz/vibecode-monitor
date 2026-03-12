@@ -20,6 +20,7 @@
  * }
  * 
  * Note: Supabase column names pakai snake_case, tapi di JS kita convert ke camelCase.
+ * tes
  */
 
 import { supabase } from './supabase.js';
