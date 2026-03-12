@@ -237,6 +237,43 @@ export async function initUI(updateGlobeVisuals) {
     });
   }
 
+  // --- Keyboard Nav for Provider Chips ---
+  if (providerChipsContainer) {
+    providerChipsContainer.addEventListener('keydown', (e) => {
+      const activeElement = document.activeElement;
+      if (!activeElement || !activeElement.classList.contains('provider-chip')) return;
+      
+      const chips = Array.from(providerChipsContainer.querySelectorAll('.provider-chip'));
+      const index = chips.indexOf(activeElement);
+      
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = (index + 1) % chips.length;
+        
+        // Roving tabindex: remove 0 from current, set to next
+        chips.forEach(c => c.setAttribute('tabindex', '-1'));
+        chips[nextIndex].setAttribute('tabindex', '0');
+        chips[nextIndex].focus();
+        
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = (index - 1 + chips.length) % chips.length;
+        
+        // Roving tabindex: remove 0 from current, set to prev
+        chips.forEach(c => c.setAttribute('tabindex', '-1'));
+        chips[prevIndex].setAttribute('tabindex', '0');
+        chips[prevIndex].focus();
+        
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activeElement.click();
+      } else if (e.key === 'Tab') {
+        // Allow normal Tab flow (will go to Status)
+        return;
+      }
+    });
+  }
+
   // --- Bulk Actions ---
   if (btnSelectMode) btnSelectMode.addEventListener('click', toggleSelectMode);
   if (chkSelectAll) chkSelectAll.addEventListener('change', handleSelectAll);
@@ -844,11 +881,11 @@ function populateProviderDropdowns() {
 function populateProviderChips() {
   if (!providerChipsContainer) return;
 
-  providerChipsContainer.innerHTML = PROVIDERS.filter(p => p.id !== 'other').map(p =>
-    `<button type="button" class="provider-chip" data-provider="${p.id}" style="--prov-color: ${p.color}">
+  providerChipsContainer.innerHTML = PROVIDERS.filter(p => p.id !== 'other').map((p, index) =>
+    `<div class="provider-chip" data-provider="${p.id}" tabindex="${index === 0 ? '0' : '-1'}" style="--prov-color: ${p.color}">
       <span class="provider-icon">${p.svgIcon}</span>
       <span>${p.name}</span>
-    </button>`
+    </div>`
   ).join('');
 
   // Event delegation untuk toggle chips
@@ -863,18 +900,7 @@ function populateProviderChips() {
     } else {
       selectedProviders.add(pid);
       chip.classList.add('active');
-
-      // Auto-fill timer to this provider's default
-      // FIX: Only auto-fill if the timer inputs are currently empty
-      const isTimerEmpty = !inputDays.value && !inputHours.value && !inputMinutes.value;
-      const p = getProvider(pid);
-      if (p && p.defaultHours > 0 && isTimerEmpty) {
-        const days = Math.floor(p.defaultHours / 24);
-        const hours = p.defaultHours % 24;
-        inputDays.value = days > 0 ? days : '';
-        inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : '');
-        inputMinutes.value = '';
-      }
+      // No more auto-fill logic here per user request
     }
 
     playClick();
@@ -956,7 +982,6 @@ function closeModal() {
   if (providerChipsContainer) {
     providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
   }
-  if (inputTags) inputTags.value = '';
   if (inputNotes) inputNotes.value = '';
 }
 
@@ -973,8 +998,6 @@ async function handleFormSubmit(e) {
   const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
   const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
   const refreshMinutes = inputMinutes.value !== '' ? parseInt(inputMinutes.value, 10) : null;
-  const tagsRaw = inputTags.value.trim();
-  const tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   const notes = inputNotes.value.trim();
   const id = inputId.value;
 
@@ -986,11 +1009,11 @@ async function handleFormSubmit(e) {
 
   if (id) {
     notifiedIds.delete(id);
-    await editAccount(id, { name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    await editAccount(id, { name, status, provider, refreshDays, refreshHours, refreshMinutes, notes });
     addLog('ACCOUNT_EDITED', `"${name}" updated (${provLabel} / ${status})`);
     playConfirm();
   } else {
-    await addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    await addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, notes });
     addLog('ACCOUNT_ADDED', `"${name}" registered (${provLabel} / ${status})`);
     playConfirm();
   }
