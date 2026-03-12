@@ -255,6 +255,11 @@ export async function initUI(updateGlobeVisuals) {
         chips[nextIndex].setAttribute('tabindex', '0');
         chips[nextIndex].focus();
         
+        // Auto-select the newly focused chip
+        selectedProviders.clear();
+        chips.forEach(c => c.classList.remove('active'));
+        chips[nextIndex].click();
+        
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault();
         const prevIndex = (index - 1 + chips.length) % chips.length;
@@ -264,12 +269,47 @@ export async function initUI(updateGlobeVisuals) {
         chips[prevIndex].setAttribute('tabindex', '0');
         chips[prevIndex].focus();
         
+        // Auto-select the newly focused chip
+        selectedProviders.clear();
+        chips.forEach(c => c.classList.remove('active'));
+        chips[prevIndex].click();
+        
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         activeElement.click();
       } else if (e.key === 'Tab') {
         // Allow normal Tab flow (will go to Status)
         return;
+      }
+    });
+  }
+
+  // --- Smart Navigation into Provider Chips ---
+  if (inputName) {
+    inputName.addEventListener('keydown', (e) => {
+      // If ArrowDown is pressed in the name input, jump to the first provider chip
+      if (e.key === 'ArrowDown' && providerChipsContainer) {
+        e.preventDefault();
+        const firstChip = providerChipsContainer.querySelector('.provider-chip');
+        if (firstChip) {
+          firstChip.focus();
+          
+          // Auto-select the first chip when entering
+          selectedProviders.clear();
+          providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
+          firstChip.click();
+        }
+      }
+    });
+  }
+
+  if (inputStatus) {
+    inputStatus.addEventListener('keydown', (e) => {
+      // If Shift+Tab or ArrowUp is pressed while on Status, jump to the last provider chip
+      if (e.key === 'Tab' && e.shiftKey && providerChipsContainer) {
+        e.preventDefault();
+        const chips = providerChipsContainer.querySelectorAll('.provider-chip');
+        if (chips.length > 0) chips[chips.length - 1].focus();
       }
     });
   }
@@ -980,7 +1020,12 @@ function closeModal() {
   accountForm.reset();
   selectedProviders.clear();
   if (providerChipsContainer) {
-    providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
+    const chips = providerChipsContainer.querySelectorAll('.provider-chip');
+    chips.forEach((c, index) => {
+      c.classList.remove('active');
+      // Reset roving tabindex so the first chip is always the first stop next time
+      c.setAttribute('tabindex', index === 0 ? '0' : '-1');
+    });
   }
   if (inputNotes) inputNotes.value = '';
 }
