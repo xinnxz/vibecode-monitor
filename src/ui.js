@@ -1112,8 +1112,10 @@ function populateProviderChips() {
       chip.classList.add('active');
 
       // Auto-fill timer to this provider's default
+      // FIX: Only auto-fill if the timer inputs are currently empty
+      const isTimerEmpty = !inputDays.value && !inputHours.value && !inputMinutes.value;
       const p = getProvider(pid);
-      if (p && p.defaultHours > 0) {
+      if (p && p.defaultHours > 0 && isTimerEmpty) {
         const days = Math.floor(p.defaultHours / 24);
         const hours = p.defaultHours % 24;
         inputDays.value = days > 0 ? days : '';
@@ -1156,9 +1158,34 @@ function openModal(editId = null) {
     });
 
     inputStatus.value = account.status;
-    inputDays.value = account.refreshDays ?? '';
-    inputHours.value = account.refreshHours ?? '';
-    inputMinutes.value = account.refreshMinutes ?? '';
+    
+    // FIX: Show currently remaining time in the inputs instead of the original duration
+    if (account.refreshDeadline) {
+      const now = new Date();
+      const deadline = new Date(account.refreshDeadline);
+      const diffMs = deadline - now;
+      
+      if (diffMs > 0) {
+        // Calculate remaining time
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        inputDays.value = days > 0 ? days : '';
+        inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : '');
+        inputMinutes.value = minutes > 0 ? minutes : '';
+      } else {
+        // Time already expired
+        inputDays.value = '';
+        inputHours.value = '';
+        inputMinutes.value = '';
+      }
+    } else {
+      // Fallback if no deadline
+      inputDays.value = account.refreshDays ?? '';
+      inputHours.value = account.refreshHours ?? '';
+      inputMinutes.value = account.refreshMinutes ?? '';
+    }
     inputTags.value = account.tags ? account.tags.join(', ') : '';
     inputNotes.value = account.notes ?? '';
     inputId.value = account.id;

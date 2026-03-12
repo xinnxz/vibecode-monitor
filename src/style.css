@@ -734,7 +734,25 @@ html, body {
   transform: translateX(-50%) translateY(0);
 }
 
+.card-notes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
 
+.card-notes svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
 .card-notes .note-text {
   overflow: hidden;
   text-overflow: ellipsis;
