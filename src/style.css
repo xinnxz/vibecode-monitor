@@ -736,22 +736,22 @@ html, body {
 
 .card-notes {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 8px;
-  border-radius: 6px;
-  margin-top: 6px;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 2px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
+  opacity: 0.85;
 }
 
 .card-notes svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.5;
+  margin-top: 1px;
 }
 .card-notes .note-text {
   overflow: hidden;
