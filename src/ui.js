@@ -1073,12 +1073,6 @@ async function copyToClipboard(text, btnElement) {
  * Populate provider dropdowns dari registry.
  */
 function populateProviderDropdowns() {
-  // Modal dropdown
-  if (inputProvider) {
-    inputProvider.innerHTML = PROVIDERS.map(p =>
-      `<option value="${p.id}">${p.name}</option>`
-    ).join('');
-  }
   // Filter dropdown (prepend "All")
   if (filterProviderEl) {
     filterProviderEl.innerHTML = '<option value="all">All Providers</option>' +
