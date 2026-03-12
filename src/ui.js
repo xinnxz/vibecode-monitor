@@ -314,6 +314,16 @@ export async function initUI(updateGlobeVisuals) {
     });
   }
 
+  if (inputNotes) {
+    inputNotes.addEventListener('keydown', (e) => {
+      // Ctrl+Enter or Cmd+Enter to submit form directly from Notes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        accountForm.requestSubmit();
+      }
+    });
+  }
+
   // --- Bulk Actions ---
   if (btnSelectMode) btnSelectMode.addEventListener('click', toggleSelectMode);
   if (chkSelectAll) chkSelectAll.addEventListener('change', handleSelectAll);
