@@ -589,11 +589,16 @@ html, body {
   align-items: center;
 }
 
-.provider-icon svg {
-  width: 14px;
-  height: 14px;
+.provider-icon svg,
+.provider-icon img {
+  width: 18px;
+  height: 18px;
   color: var(--prov-color, var(--accent-cyan));
+  /* Added filter to make dark icons stand out on dark background */
+  filter: drop-shadow(0 0 2px rgba(255,255,255,0.1));
 }
+
+
 
 /* --- Provider Badges Row (on cards) --- */
 .provider-badges-row {
@@ -645,9 +650,10 @@ html, body {
   box-shadow: 0 0 8px color-mix(in srgb, var(--prov-color) 20%, transparent);
 }
 
-.provider-chip .provider-icon svg {
-  width: 12px;
-  height: 12px;
+.provider-chip .provider-icon svg,
+.provider-chip .provider-icon img {
+  width: 16px;
+  height: 16px;
 }
 
 .card-tags {
