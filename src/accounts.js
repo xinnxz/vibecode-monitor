@@ -50,6 +50,7 @@ function fromDb(row) {
     id: row.id,
     name: row.name,
     status: row.status,
+    provider: row.provider || 'other',
     refreshDays: row.refresh_days,
     refreshHours: row.refresh_hours,
     refreshMinutes: row.refresh_minutes ?? null,
@@ -74,6 +75,7 @@ function toDb(data) {
   const row = {};
   if (data.name !== undefined) row.name = data.name;
   if (data.status !== undefined) row.status = data.status;
+  if (data.provider !== undefined) row.provider = data.provider;
   if (data.refreshDays !== undefined) row.refresh_days = data.refreshDays;
   if (data.refreshHours !== undefined) row.refresh_hours = data.refreshHours;
   if (data.refreshMinutes !== undefined) row.refresh_minutes = data.refreshMinutes;
@@ -176,10 +178,10 @@ export function getAccounts() {
  * @param {Object} data - { name, status, refreshDays, refreshHours, refreshMinutes }
  * @returns {Promise<Object|null>} Akun yang baru dibuat
  */
-export async function addAccount({ name, status, refreshDays, refreshHours, refreshMinutes, tags, notes }) {
+export async function addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes }) {
   const { data, error } = await supabase
     .from('accounts')
-    .insert(toDb({ name, status: status || 'available', refreshDays, refreshHours, refreshMinutes, tags, notes }))
+    .insert(toDb({ name, status: status || 'available', provider: provider || 'other', refreshDays, refreshHours, refreshMinutes, tags, notes }))
     .select()   // Return inserted row
     .single();  // Expect exactly 1 row
 

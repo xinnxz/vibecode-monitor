@@ -27,6 +27,7 @@ import { addLog } from './activity-log.js';
 import { getHistory } from './history.js';
 import { getWebhookConfig, saveWebhookConfig, sendWebhookNotification } from './webhook.js';
 import { playClick, playConfirm, playDelete, playAlert } from './sounds.js';
+import { PROVIDERS, getProvider } from './providers.js';
 
 // --- DOM Elements ---
 let accountListEl,
@@ -62,7 +63,9 @@ let accountListEl,
   settingsForm,
   inputDiscordUrl,
   inputTelegramToken,
-  inputTelegramChatId;
+  inputTelegramChatId,
+  inputProvider,
+  filterProviderEl;
 
 // State untuk Bulk Actions
 let isSelectMode = false;
@@ -83,6 +86,9 @@ let searchDebounceTimer = null;
 
 // Sort state: 'default' | 'name-asc' | 'name-desc' | 'time-asc' | 'status'
 let currentSort = 'default';
+
+// Provider filter state
+let currentProviderFilter = 'all';
 
 // Set untuk track akun yang sudah pernah di-notify (cegah duplikat)
 const notifiedIds = new Set();
@@ -136,6 +142,33 @@ export async function initUI(updateGlobeVisuals) {
   inputDiscordUrl = document.getElementById('input-discord-url');
   inputTelegramToken = document.getElementById('input-telegram-token');
   inputTelegramChatId = document.getElementById('input-telegram-chatid');
+  inputProvider = document.getElementById('input-provider');
+  filterProviderEl = document.getElementById('filter-provider');
+
+  // Populate provider dropdowns from registry
+  populateProviderDropdowns();
+
+  // Auto-fill timer when provider changes
+  if (inputProvider) {
+    inputProvider.addEventListener('change', () => {
+      const p = getProvider(inputProvider.value);
+      if (p && p.defaultHours > 0) {
+        const days = Math.floor(p.defaultHours / 24);
+        const hours = p.defaultHours % 24;
+        inputDays.value = days > 0 ? days : '';
+        inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : '');
+        inputMinutes.value = '';
+      }
+    });
+  }
+
+  // Filter by provider
+  if (filterProviderEl) {
+    filterProviderEl.addEventListener('change', () => {
+      currentProviderFilter = filterProviderEl.value;
+      renderAccountList(getAccounts());
+    });
+  }
 
   // Setup click listeners untuk Timer Presets di Modal
   setupTimerPresets();
@@ -340,7 +373,12 @@ function renderAccountList(accounts) {
     result = result.filter((a) => a.name.toLowerCase().includes(searchTerm));
   }
 
-  // 3. Sort
+  // 3. Filter by provider
+  if (currentProviderFilter !== 'all') {
+    result = result.filter((a) => a.provider === currentProviderFilter);
+  }
+
+  // 4. Sort
   result = sortAccounts(result, currentSort);
 
   if (result.length === 0) {
@@ -361,6 +399,13 @@ function renderAccountList(accounts) {
         const statusTextClass = isAvailable ? 'available' : 'limited';
         const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
         const countdownHtml = renderCountdown(account);
+
+        // Provider badge
+        const prov = getProvider(account.provider);
+        const provBadgeHtml = `<div class="provider-badge" style="--prov-color: ${prov.color}">
+          <span class="provider-icon">${prov.svgIcon}</span>
+          <span>${prov.name}</span>
+        </div>`;
 
         const tagsHtml = (account.tags && account.tags.length > 0)
           ? `<div class="card-tags">${account.tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
@@ -420,6 +465,7 @@ function renderAccountList(accounts) {
 
       <!-- Card body with terminal-like meta info -->
       <div class="card-body">
+        ${provBadgeHtml}
         <div class="card-name">
           <span class="card-name-prefix">&gt;</span>
           ${escapeHtml(account.name)}
@@ -1029,11 +1075,32 @@ async function copyToClipboard(text, btnElement) {
 }
 
 /**
+ * Populate provider dropdowns dari registry.
+ */
+function populateProviderDropdowns() {
+  // Modal dropdown
+  if (inputProvider) {
+    inputProvider.innerHTML = PROVIDERS.map(p =>
+      `<option value="${p.id}">${p.name}</option>`
+    ).join('');
+  }
+  // Filter dropdown (prepend "All")
+  if (filterProviderEl) {
+    filterProviderEl.innerHTML = '<option value="all">All Providers</option>' +
+      PROVIDERS.filter(p => p.id !== 'other').map(p =>
+        `<option value="${p.id}">${p.name}</option>`
+      ).join('') +
+      '<option value="other">Other</option>';
+  }
+}
+
+/**
  * Buka modal form.
  */
 function openModal(editId = null) {
   accountForm.reset();
   inputId.value = '';
+  if (inputProvider) inputProvider.value = 'claude'; // Default provider
 
   if (editId) {
     const accounts = getAccounts();
@@ -1042,6 +1109,7 @@ function openModal(editId = null) {
 
     modalTitle.textContent = '// edit_account';
     inputName.value = account.name;
+    if (inputProvider) inputProvider.value = account.provider || 'other';
     inputStatus.value = account.status;
     inputDays.value = account.refreshDays ?? '';
     inputHours.value = account.refreshHours ?? '';
@@ -1097,6 +1165,7 @@ async function handleFormSubmit(e) {
 
   const name = inputName.value.trim();
   const status = inputStatus.value;
+  const provider = inputProvider ? inputProvider.value : 'other';
   const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
   const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
   const refreshMinutes = inputMinutes.value !== '' ? parseInt(inputMinutes.value, 10) : null;
@@ -1111,12 +1180,12 @@ async function handleFormSubmit(e) {
 
   if (id) {
     notifiedIds.delete(id);
-    await editAccount(id, { name, status, refreshDays, refreshHours, refreshMinutes, tags, notes });
-    addLog('ACCOUNT_EDITED', `"${name}" updated (status: ${status})`);
+    await editAccount(id, { name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    addLog('ACCOUNT_EDITED', `"${name}" updated (${provider} / ${status})`);
     playConfirm();
   } else {
-    await addAccount({ name, status, refreshDays, refreshHours, refreshMinutes, tags, notes });
-    addLog('ACCOUNT_ADDED', `"${name}" registered (status: ${status})`);
+    await addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
+    addLog('ACCOUNT_ADDED', `"${name}" registered (${provider} / ${status})`);
     playConfirm();
   }
 }
