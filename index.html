@@ -232,10 +232,10 @@ NET: UPLINK_SECURE
               <input type="text" id="input-name" placeholder="gmail_pro_01" required />
             </div>
             <div class="form-group">
-              <label for="input-provider">provider</label>
-              <select id="input-provider">
+              <label>provider (multi-select)</label>
+              <div id="provider-chips" class="provider-chips-container">
                 <!-- Populated dynamically from providers.js -->
-              </select>
+              </div>
             </div>
             <div class="form-group">
               <label for="input-status">status</label>
@@ -245,14 +245,7 @@ NET: UPLINK_SECURE
               </select>
             </div>
             <div class="form-group form-time-group">
-              <label for="input-days">refresh_timer
-                <div class="timer-presets">
-                  <button type="button" class="btn-preset" data-h="24">Cursor (24h)</button>
-                  <button type="button" class="btn-preset" data-h="4">Claude (4h)</button>
-                  <button type="button" class="btn-preset" data-h="3">ChatGPT (3h)</button>
-                  <button type="button" class="btn-preset" data-h="1">Gemini (1h)</button>
-                </div>
-              </label>
+              <label for="input-days">refresh_timer</label>
               <div class="duration-inputs">
                 <div class="duration-field">
                   <input type="number" id="input-days" min="0" max="30" placeholder="0" />

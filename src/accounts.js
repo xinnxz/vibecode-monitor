@@ -20,7 +20,6 @@
  * }
  * 
  * Note: Supabase column names pakai snake_case, tapi di JS kita convert ke camelCase.
- * tes
  */
 
 import { supabase } from './supabase.js';
@@ -51,7 +50,7 @@ function fromDb(row) {
     id: row.id,
     name: row.name,
     status: row.status,
-    provider: row.provider || 'other',
+    provider: row.provider || [],
     refreshDays: row.refresh_days,
     refreshHours: row.refresh_hours,
     refreshMinutes: row.refresh_minutes ?? null,
@@ -182,7 +181,7 @@ export function getAccounts() {
 export async function addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes }) {
   const { data, error } = await supabase
     .from('accounts')
-    .insert(toDb({ name, status: status || 'available', provider: provider || 'other', refreshDays, refreshHours, refreshMinutes, tags, notes }))
+    .insert(toDb({ name, status: status || 'available', provider: provider || [], refreshDays, refreshHours, refreshMinutes, tags, notes }))
     .select()   // Return inserted row
     .single();  // Expect exactly 1 row
 

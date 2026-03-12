@@ -64,7 +64,7 @@ let accountListEl,
   inputDiscordUrl,
   inputTelegramToken,
   inputTelegramChatId,
-  inputProvider,
+  providerChipsContainer,
   filterProviderEl;
 
 // State untuk Bulk Actions
@@ -89,6 +89,9 @@ let currentSort = 'default';
 
 // Provider filter state
 let currentProviderFilter = 'all';
+
+// Selected providers in modal (Set of provider IDs)
+const selectedProviders = new Set();
 
 // Set untuk track akun yang sudah pernah di-notify (cegah duplikat)
 const notifiedIds = new Set();
@@ -142,25 +145,12 @@ export async function initUI(updateGlobeVisuals) {
   inputDiscordUrl = document.getElementById('input-discord-url');
   inputTelegramToken = document.getElementById('input-telegram-token');
   inputTelegramChatId = document.getElementById('input-telegram-chatid');
-  inputProvider = document.getElementById('input-provider');
+  providerChipsContainer = document.getElementById('provider-chips');
   filterProviderEl = document.getElementById('filter-provider');
 
-  // Populate provider dropdowns from registry
+  // Populate provider dropdowns and chips from registry
   populateProviderDropdowns();
-
-  // Auto-fill timer when provider changes
-  if (inputProvider) {
-    inputProvider.addEventListener('change', () => {
-      const p = getProvider(inputProvider.value);
-      if (p && p.defaultHours > 0) {
-        const days = Math.floor(p.defaultHours / 24);
-        const hours = p.defaultHours % 24;
-        inputDays.value = days > 0 ? days : '';
-        inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : '');
-        inputMinutes.value = '';
-      }
-    });
-  }
+  populateProviderChips();
 
   // Filter by provider
   if (filterProviderEl) {
@@ -169,9 +159,6 @@ export async function initUI(updateGlobeVisuals) {
       renderAccountList(getAccounts());
     });
   }
-
-  // Setup click listeners untuk Timer Presets di Modal
-  setupTimerPresets();
 
   // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
   // OrbitControls memasang wheel listener di renderer.domElement;
@@ -400,12 +387,17 @@ function renderAccountList(accounts) {
         const shortId = account.id.replace(/-/g, '').slice(0, 12).toUpperCase();
         const countdownHtml = renderCountdown(account);
 
-        // Provider badge
-        const prov = getProvider(account.provider);
-        const provBadgeHtml = `<div class="provider-badge" style="--prov-color: ${prov.color}">
-          <span class="provider-icon">${prov.svgIcon}</span>
-          <span>${prov.name}</span>
-        </div>`;
+        // Provider badges (multiple)
+        const providerArr = Array.isArray(account.provider) ? account.provider : (account.provider ? [account.provider] : []);
+        const provBadgesHtml = providerArr.length > 0
+          ? providerArr.map(pid => {
+              const prov = getProvider(pid);
+              return `<div class="provider-badge" style="--prov-color: ${prov.color}">
+                <span class="provider-icon">${prov.svgIcon}</span>
+                <span>${prov.name}</span>
+              </div>`;
+            }).join('')
+          : '';
 
         const tagsHtml = (account.tags && account.tags.length > 0)
           ? `<div class="card-tags">${account.tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
@@ -465,7 +457,7 @@ function renderAccountList(accounts) {
 
       <!-- Card body with terminal-like meta info -->
       <div class="card-body">
-        ${provBadgeHtml}
+        <div class="provider-badges-row">${provBadgesHtml}</div>
         <div class="card-name">
           <span class="card-name-prefix">&gt;</span>
           ${escapeHtml(account.name)}
