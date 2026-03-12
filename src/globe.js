@@ -542,20 +542,29 @@ function createSpaceEnvironment() {
   // 3. Realistic Moon
   // ============================
   const R = CONFIG.earth.radius;
-  const moonGeo = new THREE.SphereGeometry(R * 0.25, 32, 32);
+  const moonGeo = new THREE.SphereGeometry(R * 0.3, 64, 64);
   const moonMat = new THREE.MeshStandardMaterial({
     map: textures.moon,
-    roughness: 0.8,
-    metalness: 0.1
+    roughness: 0.45,
+    metalness: 0.4,
+    color: 0xffffff,
+    emissive: 0x0a1526,
+    emissiveIntensity: 0.8,
   });
   moonMesh = new THREE.Mesh(moonGeo, moonMat);
-  moonMesh.position.set(160, 60, -100);
+  moonMesh.position.set(150, 70, -100);
 
-  const moonLight = new THREE.PointLight(0xffffff, 2, 800);
-  moonLight.position.set(250, 100, 100);
+  // Cinematic main light (cool white)
+  const moonLight = new THREE.DirectionalLight(0xeef4ff, 5.0);
+  moonLight.position.set(250, 100, 50);
   scene.add(moonLight);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+  // Holographic rim light (cyan)
+  const rimLight = new THREE.PointLight(0x00f0ff, 600, 400); // Higher intensity for modern Three.js
+  rimLight.position.set(100, 50, -150);
+  scene.add(rimLight);
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
   scene.add(ambientLight);
   scene.add(moonMesh);
 

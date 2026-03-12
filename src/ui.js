@@ -402,9 +402,7 @@ function renderAccountList(accounts) {
             }).join('')
           : '';
 
-        const tagsHtml = (account.tags && account.tags.length > 0)
-          ? `<div class="card-tags">${account.tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
-          : '';
+        // Tags are removed since Provider badges replace them
 
         const notesHtml = account.notes
           ? `<div class="card-notes" title="Notes">
@@ -465,7 +463,6 @@ function renderAccountList(accounts) {
           <span class="card-name-prefix">&gt;</span>
           ${escapeHtml(account.name)}
         </div>
-        ${tagsHtml}
         ${notesHtml}
         <div class="card-meta">
           <div class="card-meta-row">
@@ -1186,7 +1183,6 @@ function openModal(editId = null) {
       inputHours.value = account.refreshHours ?? '';
       inputMinutes.value = account.refreshMinutes ?? '';
     }
-    inputTags.value = account.tags ? account.tags.join(', ') : '';
     inputNotes.value = account.notes ?? '';
     inputId.value = account.id;
   } else {
