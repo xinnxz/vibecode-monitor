@@ -362,7 +362,10 @@ function renderAccountList(accounts) {
 
   // 3. Filter by provider
   if (currentProviderFilter !== 'all') {
-    result = result.filter((a) => a.provider === currentProviderFilter);
+    result = result.filter((a) => {
+      const provArr = Array.isArray(a.provider) ? a.provider : (a.provider ? [a.provider] : []);
+      return provArr.includes(currentProviderFilter);
+    });
   }
 
   // 4. Sort
@@ -1087,12 +1090,60 @@ function populateProviderDropdowns() {
 }
 
 /**
+ * Buat clickable provider chips di modal form.
+ * Setiap chip bisa di-toggle on/off (multi-select).
+ * Saat di-klik, otomatis auto-fill timer ke default provider tersebut.
+ */
+function populateProviderChips() {
+  if (!providerChipsContainer) return;
+
+  providerChipsContainer.innerHTML = PROVIDERS.filter(p => p.id !== 'other').map(p =>
+    `<button type="button" class="provider-chip" data-provider="${p.id}" style="--prov-color: ${p.color}">
+      <span class="provider-icon">${p.svgIcon}</span>
+      <span>${p.name}</span>
+    </button>`
+  ).join('');
+
+  // Event delegation untuk toggle chips
+  providerChipsContainer.addEventListener('click', (e) => {
+    const chip = e.target.closest('.provider-chip');
+    if (!chip) return;
+
+    const pid = chip.dataset.provider;
+    if (selectedProviders.has(pid)) {
+      selectedProviders.delete(pid);
+      chip.classList.remove('active');
+    } else {
+      selectedProviders.add(pid);
+      chip.classList.add('active');
+
+      // Auto-fill timer to this provider's default
+      const p = getProvider(pid);
+      if (p && p.defaultHours > 0) {
+        const days = Math.floor(p.defaultHours / 24);
+        const hours = p.defaultHours % 24;
+        inputDays.value = days > 0 ? days : '';
+        inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : '');
+        inputMinutes.value = '';
+      }
+    }
+
+    playClick();
+  });
+}
+
+/**
  * Buka modal form.
  */
 function openModal(editId = null) {
   accountForm.reset();
   inputId.value = '';
-  if (inputProvider) inputProvider.value = 'claude'; // Default provider
+  selectedProviders.clear();
+
+  // Reset all chips to inactive
+  if (providerChipsContainer) {
+    providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
+  }
 
   if (editId) {
     const accounts = getAccounts();
@@ -1101,7 +1152,15 @@ function openModal(editId = null) {
 
     modalTitle.textContent = '// edit_account';
     inputName.value = account.name;
-    if (inputProvider) inputProvider.value = account.provider || 'other';
+
+    // Restore selected providers
+    const provArr = Array.isArray(account.provider) ? account.provider : (account.provider ? [account.provider] : []);
+    provArr.forEach(pid => {
+      selectedProviders.add(pid);
+      const chip = providerChipsContainer?.querySelector(`[data-provider="${pid}"]`);
+      if (chip) chip.classList.add('active');
+    });
+
     inputStatus.value = account.status;
     inputDays.value = account.refreshDays ?? '';
     inputHours.value = account.refreshHours ?? '';
@@ -1117,33 +1176,13 @@ function openModal(editId = null) {
   setTimeout(() => inputName.focus(), 100);
 }
 
-/**
- * Setup event delegation untuk tombol Timer Presets di modal
- */
-function setupTimerPresets() {
-  const formTimeGroup = document.querySelector('.form-time-group');
-  if (!formTimeGroup) return;
-
-  formTimeGroup.addEventListener('click', (e) => {
-    if (e.target.classList.contains('btn-preset')) {
-      const hoursToAdd = parseInt(e.target.dataset.h, 10);
-      if (isNaN(hoursToAdd)) return;
-
-      const days = Math.floor(hoursToAdd / 24);
-      const hours = hoursToAdd % 24;
-
-      inputDays.value = days > 0 ? days : '';
-      inputHours.value = hours > 0 ? hours : (days > 0 ? '0' : ''); // Set 0 if days > 0 but hours is 0 (e.g. 24h = 1d 0h)
-      inputMinutes.value = '';
-      
-      playClick();
-    }
-  });
-}
-
 function closeModal() {
   modalOverlay.classList.add('hidden');
   accountForm.reset();
+  selectedProviders.clear();
+  if (providerChipsContainer) {
+    providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
+  }
   if (inputTags) inputTags.value = '';
   if (inputNotes) inputNotes.value = '';
 }
@@ -1157,7 +1196,7 @@ async function handleFormSubmit(e) {
 
   const name = inputName.value.trim();
   const status = inputStatus.value;
-  const provider = inputProvider ? inputProvider.value : 'other';
+  const provider = Array.from(selectedProviders);
   const refreshDays = inputDays.value !== '' ? parseInt(inputDays.value, 10) : null;
   const refreshHours = inputHours.value !== '' ? parseInt(inputHours.value, 10) : null;
   const refreshMinutes = inputMinutes.value !== '' ? parseInt(inputMinutes.value, 10) : null;
@@ -1168,16 +1207,18 @@ async function handleFormSubmit(e) {
 
   if (!name) return;
 
+  const provLabel = provider.length > 0 ? provider.join(', ') : 'none';
+
   closeModal();
 
   if (id) {
     notifiedIds.delete(id);
     await editAccount(id, { name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
-    addLog('ACCOUNT_EDITED', `"${name}" updated (${provider} / ${status})`);
+    addLog('ACCOUNT_EDITED', `"${name}" updated (${provLabel} / ${status})`);
     playConfirm();
   } else {
     await addAccount({ name, status, provider, refreshDays, refreshHours, refreshMinutes, tags, notes });
-    addLog('ACCOUNT_ADDED', `"${name}" registered (${provider} / ${status})`);
+    addLog('ACCOUNT_ADDED', `"${name}" registered (${provLabel} / ${status})`);
     playConfirm();
   }
 }
