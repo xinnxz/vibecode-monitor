@@ -161,3 +161,39 @@ export function playDelete() {
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + 0.15);
 }
+
+/**
+ * Play suara "sonar ping" dengan Spatial Audio (Stereo Panning).
+ * Digunakan untuk: klik pada bola dunia (Globe Interactivity).
+ * 
+ * @param {number} panValue - Nilai panning dari -1.0 (Kiri) hingga 1.0 (Kanan)
+ */
+export function playSpatialPing(panValue = 0) {
+  if (!soundEnabled) return;
+  const ctx = ensureContext();
+  
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  
+  // Buat node Panner untuk efek spatial (stereo)
+  const panner = ctx.createStereoPanner();
+  // Clamp value antara -1 dan 1 untuk safety
+  panner.pan.value = Math.max(-1, Math.min(1, panValue));
+  
+  // Karakter Sonar Ping: Sine wave, high pitch yang cepat turun
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(1600, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.4);
+  
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.05); // Attack cepat
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8); // Decay panjang menggema
+  
+  // Routing: Oscillator -> Gain -> Panner -> Destination (Speaker)
+  osc.connect(gain);
+  gain.connect(panner);
+  panner.connect(ctx.destination);
+  
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.8);
+}

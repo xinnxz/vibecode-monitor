@@ -35,10 +35,17 @@ async function boot() {
   const globe = initGlobe(container);
 
   // 3. Init UI (async: fetch data dari Supabase)
-  // Wrap updateVisuals to also trigger a globe ping on data changes
+  // Wrap updateVisuals and add focus callback
+  let focusGlobeCb = null;
   await initUI((accounts) => {
     globe.updateVisuals(accounts);
     globe.shootPing();
+  }, (accountName, isReset = false) => {
+    if (isReset) {
+      if (globe.resetCameraFocus) globe.resetCameraFocus();
+    } else {
+      if (globe.focusOnAccount) globe.focusOnAccount(accountName);
+    }
   });
 
   // 4. Init Activity Log

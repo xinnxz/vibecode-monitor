@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import gsap from 'gsap';
+import { playSpatialPing } from './sounds.js';
 
 import {
   lon2xyz,
@@ -79,6 +80,9 @@ let textures = {};
 let isUserDragging = false; // Flag: true saat user hold/drag globe
 let isHoveringGlobe = false; // Flag: true saat mouse hover di atas canvas
 let pingRings = []; // Temporary ping ring meshes
+let mousePos = new THREE.Vector2(-5, -5); // Mouse position normalized (-1 to +1)
+let hoveredLabel = null; // Currently hovered label sprite
+let activeHaloMesh = null; // Glowing halo for the clicked/active account
 
 // Shader uniforms untuk scan line animation
 let uniforms;
@@ -153,7 +157,13 @@ export function initGlobe(container) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
-  controls.enablePan = false;
+  controls.enablePan = true; // Enabled panning (right-click drag)
+  controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.PAN
+  };
+  controls.panSpeed = 1.0; 
   controls.minDistance = 80;
   controls.maxDistance = 350;
   controls.autoRotate = true;
@@ -193,9 +203,19 @@ export function initGlobe(container) {
   // --- Events ---
   window.addEventListener('resize', onResize);
 
-  // Mouse hover detection for globe slow-down
+  // Mouse hover detection for globe slow-down and UI tooltips
   renderer.domElement.addEventListener('mouseenter', () => { isHoveringGlobe = true; });
-  renderer.domElement.addEventListener('mouseleave', () => { isHoveringGlobe = false; });
+  renderer.domElement.addEventListener('mouseleave', () => { 
+    isHoveringGlobe = false;
+    mousePos.set(-5, -5); // move mouse offscreen
+  });
+
+  // Track mouse for raycasting tooltips
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mousePos.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mousePos.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  });
 
   // Raycaster for click interactivity (shoot ping at cursor)
   renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -215,6 +235,10 @@ export function initGlobe(container) {
       // Push it slightly outward to avoid z-fighting
       localPoint.normalize().multiplyScalar(CONFIG.earth.radius + 0.5);
       shootPing({ count: 1, pos: localPoint, color: 0x38bdf8 });
+      
+      // Play 3D Spatial Audio Ping!
+      // mouse.x is already normalized -1 (left) to 1 (right)
+      playSpatialPing(mouse.x);
     }
   });
 
@@ -227,6 +251,8 @@ export function initGlobe(container) {
     renderer,
     updateVisuals: updateAccountVisuals,
     shootPing,
+    focusOnAccount,
+    resetCameraFocus,
   };
 }
 
@@ -731,14 +757,60 @@ export function updateAccountVisuals(accounts) {
   }
 
   const R = CONFIG.earth.radius;
-  const hubCity = WORLD_CITIES[0]; // New York as hub for fly arcs
 
-  accounts.forEach((account, index) => {
-    const city = WORLD_CITIES[index % WORLD_CITIES.length];
+  // Linear Congruential Generator for deterministic random numbers
+  function PRNG(seed) {
+    this.seed = seed % 2147483647;
+    if (this.seed <= 0) this.seed += 2147483646;
+  }
+  PRNG.prototype.next = function() {
+    return this.seed = this.seed * 16807 % 2147483647;
+  };
+  PRNG.prototype.nextFloat = function() {
+    return (this.next() - 1) / 2147483646;
+  };
+
+  const hashString = (val) => {
+    const str = String(val);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+  };
+
+  // PASS 1: Generate coordinates for all accounts
+  const accountNodes = accounts.map((account) => {
+    const idHash = hashString(account.id);
+    const prng = new PRNG(idHash);
+    
+    // Pick a base city
+    const cityIndex = idHash % WORLD_CITIES.length;
+    const baseCity = WORLD_CITIES[cityIndex];
+    
+    // Add deterministic random spread (-8 to +8 degrees) to prevent stacking
+    const offsetN = (prng.nextFloat() * 16) - 8;
+    const offsetE = (prng.nextFloat() * 16) - 8;
+    
+    return {
+      account,
+      prng,
+      city: {
+        N: baseCity.N + offsetN,
+        E: baseCity.E + offsetE,
+        name: baseCity.name
+      }
+    };
+  });
+
+  // PASS 2: Create meshes and connect nodes
+  accountNodes.forEach((node, i) => {
+    const { account, prng, city } = node;
+    
     const isAvailable = account.status === 'available';
     const color = isAvailable
-      ? CONFIG.punctuation.lightColumn.startColor
-      : CONFIG.punctuation.lightColumn.endColor;
+      ? CONFIG.punctuation.lightColumn.startColor // Cyan/Green
+      : CONFIG.punctuation.lightColumn.endColor;  // Red
 
     // --- Label marker (base circle) ---
     const markerMat = new THREE.MeshBasicMaterial({
@@ -748,6 +820,7 @@ export function updateAccountVisuals(accounts) {
       depthWrite: false,
     });
     const marker = createPointMesh({ radius: R, lon: city.E, lat: city.N, material: markerMat });
+    marker.userData.accountId = account.id;
     markupPointGroup.add(marker);
 
     // --- Light Pillar ---
@@ -758,6 +831,8 @@ export function updateAccountVisuals(accounts) {
       texture: textures.light_column,
       color: color,
     });
+    pillar.userData.accountId = account.id;
+    pillar.userData.baseColor = color; 
     markupPointGroup.add(pillar);
 
     // --- Wave Ripple ---
@@ -767,25 +842,37 @@ export function updateAccountVisuals(accounts) {
       lat: city.N,
       texture: textures.aperture,
     });
+    wave.userData.accountId = account.id;
     markupPointGroup.add(wave);
     waveMeshArr.push(wave);
 
-    // --- Fly Arcs (from hub to other cities) ---
-    if (index > 0) {
-      const arcline = flyArc(
-        R,
-        hubCity.E, hubCity.N,
-        city.E, city.N,
-        CONFIG.flyLine
-      );
-      flyLineArcGroup.add(arcline);
-      if (arcline.userData.flyLine) {
-        flyLineArcGroup.userData.flyLineArray.push(arcline.userData.flyLine);
+    // --- Fly Arcs (Inter-node connections) ---
+    // Connect each account to 1 or 2 other random accounts to form a global network
+    if (accountNodes.length > 1) {
+      // Connect to Target 1
+      let targetIdx1 = Math.floor(prng.nextFloat() * accountNodes.length);
+      if (targetIdx1 === i) targetIdx1 = (i + 1) % accountNodes.length;
+      let targetNode1 = accountNodes[targetIdx1];
+      
+      const arcline1 = flyArc(R, city.E, city.N, targetNode1.city.E, targetNode1.city.N, CONFIG.flyLine);
+      flyLineArcGroup.add(arcline1);
+      if (arcline1.userData.flyLine) flyLineArcGroup.userData.flyLineArray.push(arcline1.userData.flyLine);
+
+      // Connect to Target 2 (if enough nodes exist and odds favor it)
+      if (accountNodes.length > 2 && prng.nextFloat() > 0.3) {
+        let targetIdx2 = Math.floor(prng.nextFloat() * accountNodes.length);
+        if (targetIdx2 !== i && targetIdx2 !== targetIdx1) {
+          let targetNode2 = accountNodes[targetIdx2];
+          const arcline2 = flyArc(R, city.E, city.N, targetNode2.city.E, targetNode2.city.N, CONFIG.flyLine);
+          flyLineArcGroup.add(arcline2);
+          if (arcline2.userData.flyLine) flyLineArcGroup.userData.flyLineArray.push(arcline2.userData.flyLine);
+        }
       }
     }
 
     // --- Label Sprite (nama account) ---
     const label = createLabelSprite(account.name, city, R);
+    label.userData.accountId = account.id;
     markupPointGroup.add(label);
     labelSprites.push(label);
   });
@@ -856,6 +943,7 @@ function createLabelSprite(text, city, radius) {
   const material = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
+    opacity: 0.6, // Visible by default, raycaster will boost to 1 on hover
     depthWrite: false,
   });
   const sprite = new THREE.Sprite(material);
@@ -917,7 +1005,7 @@ function shootPing({ count = 3, pos = null, color = null } = {}) {
       pingRings.push(ringMesh);
     }, i * 250); // 250ms stagger
   }
-}
+} // <-- Missing closing brace restored
 
 // ============================================================
 // ENTRY ANIMATION
@@ -931,6 +1019,170 @@ function showEntryAnimation() {
     duration: 2,
     ease: 'power2.out',
   });
+}
+
+// ============================================================
+// CINEMATIC CAMERA FOCUS (GSAP Auto-Zoom)
+// ============================================================
+
+/**
+ * Animates the camera and OrbitControls target to focus on a specific account's city.
+ * @param {string} accountId - The ID of the account to focus on.
+ */
+function focusOnAccount(accountId) {
+  if (!controls || !camera || !markupPointGroup) return;
+
+  // Highlight the target pillar
+  highlightActiveAccount(accountId);
+
+  // Find the exact pillar for this account to get its 3D position
+  let targetPillar = null;
+  markupPointGroup.children.forEach(child => {
+    if (child.isGroup && String(child.userData.accountId) === String(accountId)) {
+      targetPillar = child;
+    }
+  });
+
+  if (!targetPillar) return; // Account not found on globe
+  
+  const R = CONFIG.earth.radius;
+  
+  // Get world position of the pillar's base
+  const targetPos = new THREE.Vector3();
+  targetPillar.getWorldPosition(targetPos);
+  
+  // Calculate camera stand-off position (zoomed in, looking at target)
+  // We project the target position outward by slightly more than radius
+  const cameraPos = targetPos.clone().normalize().multiplyScalar(R * 2.2);
+
+  // Stop auto-rotate momentarily
+  const prevAutoRotate = controls.autoRotate;
+  controls.autoRotate = false;
+
+  // Animate Camera Position
+  gsap.to(camera.position, {
+    x: cameraPos.x,
+    y: cameraPos.y,
+    z: cameraPos.z,
+    duration: 1.5,
+    ease: "power3.inOut"
+  });
+
+  // Animate Controls Target (where the camera is looking)
+  gsap.to(controls.target, {
+    x: targetPos.x,
+    y: targetPos.y,
+    z: targetPos.z,
+    duration: 1.5,
+    ease: "power3.inOut",
+    onUpdate: () => controls.update(),
+    onComplete: () => {
+      // Resume auto-rotate if it was previously enabled
+      controls.autoRotate = prevAutoRotate;
+      
+      // Fire a ping ring at the destination for extra flair
+      shootPing({ count: 2, pos: targetPos, color: 0x38bdf8 });
+    }
+  });
+}
+
+/**
+ * Resets the camera and OrbitControls target to the default view.
+ */
+function resetCameraFocus() {
+  if (!controls || !camera) return;
+
+  highlightActiveAccount(null);
+
+  const prevAutoRotate = controls.autoRotate;
+  controls.autoRotate = false;
+
+  // Animate Camera Position back to default (0, 20, 160)
+  gsap.to(camera.position, {
+    x: 0,
+    y: 20,
+    z: 160,
+    duration: 1.5,
+    ease: "power3.inOut"
+  });
+
+  // Animate Controls Target back to center (0, 0, 0)
+  gsap.to(controls.target, {
+    x: 0,
+    y: 0,
+    z: 0,
+    duration: 1.5,
+    ease: "power3.inOut",
+    onUpdate: () => controls.update(),
+    onComplete: () => {
+      // Resume auto-rotate if it was previously enabled
+      controls.autoRotate = prevAutoRotate;
+    }
+  });
+}
+
+// ============================================================
+// ACTIVE HIGHLIGHT LOGIC
+// ============================================================
+
+/**
+ * Applies a visual highlight (size, color, pulsing halo) to the selected account's pillar.
+ */
+function highlightActiveAccount(accountId) {
+  if (!markupPointGroup) return;
+
+  // 1. Reset previous highlights
+  markupPointGroup.children.forEach(child => {
+    if (child.isGroup && child.userData.baseColor) {
+      // It's a pillar. Reset scale and color.
+      child.scale.set(1, 1, 1);
+      child.children.forEach(p => p.material.color.setHex(child.userData.baseColor));
+    }
+  });
+
+  // 2. Clear massive halo if no account selected
+  if (!accountId) {
+    if (activeHaloMesh && earthGroup) {
+       earthGroup.remove(activeHaloMesh);
+       activeHaloMesh.geometry.dispose();
+       activeHaloMesh.material.dispose();
+       activeHaloMesh = null;
+    }
+    return;
+  }
+
+  // 3. Apply new highlight to the specific pillar
+  let targetPillar = null;
+  markupPointGroup.children.forEach(child => {
+    if (child.isGroup && String(child.userData.accountId) === String(accountId)) {
+      targetPillar = child;
+      // Make it taller and thicker
+      child.scale.set(2.5, 2.5, 2.5);
+      // Make it intensely bright white/cyan
+      child.children.forEach(p => p.material.color.setHex(0xffffff));
+    }
+  });
+
+  // 4. Create or move the massive pulsing halo on the ground
+  if (targetPillar && earthGroup) {
+    if (!activeHaloMesh) {
+       const geo = new THREE.PlaneGeometry(1, 1);
+       const mat = new THREE.MeshBasicMaterial({
+         color: 0x38bdf8,
+         map: textures.aperture, // Use the wave texture
+         transparent: true,
+         depthWrite: false,
+         blending: THREE.AdditiveBlending // Glow effect
+       });
+       activeHaloMesh = new THREE.Mesh(geo, mat);
+       earthGroup.add(activeHaloMesh);
+    }
+    
+    // Position halo exactly at the pillar's unscaled base coordinates
+    activeHaloMesh.position.copy(targetPillar.position);
+    activeHaloMesh.quaternion.copy(targetPillar.quaternion);
+    activeHaloMesh.userData.pulse = 0;
+  }
 }
 
 // ============================================================
@@ -968,6 +1220,16 @@ function animate() {
       ring.material.dispose();
       pingRings.splice(i, 1);
     }
+  }
+
+  // Animate active highlight pulsating halo
+  if (activeHaloMesh) {
+    activeHaloMesh.userData.pulse += 0.05; // speed
+    // Scale between roughly 8x and 12x size
+    const s = 10 + Math.sin(activeHaloMesh.userData.pulse) * 2;
+    activeHaloMesh.scale.set(s, s, s);
+    // Smooth alpha throb
+    activeHaloMesh.material.opacity = 0.6 + Math.sin(activeHaloMesh.userData.pulse * 2) * 0.4;
   }
 
   // Satellite rotation
@@ -1021,6 +1283,23 @@ function animate() {
       mesh.userData.scale = 1;
     }
   });
+
+  // Raycast hover detection for 3D Tooltips (Labels)
+  if (labelSprites.length > 0) {
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mousePos, camera);
+    const intersects = raycaster.intersectObjects(labelSprites, false);
+    
+    // Determine the new hovered label
+    const newHovered = intersects.length > 0 ? intersects[0].object : null;
+    
+    // Smoothly animate opacities
+    labelSprites.forEach(sprite => {
+      const targetOpacity = (sprite === newHovered) ? 1.0 : 0.6;
+      // Lerp opacity towards target
+      sprite.material.opacity += (targetOpacity - sprite.material.opacity) * 0.15;
+    });
+  }
 
   renderer.render(scene, camera);
 }
