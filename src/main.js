@@ -22,6 +22,7 @@ import { initMatrixRain } from './matrix-rain.js';
 import { toggleSound } from './sounds.js';
 import { downloadBackup, handleImport } from './export-import.js';
 import { toggleAmbient } from './ambient-music.js';
+import { initCommandPalette } from './command-palette.js';
 
 // --- Inisialisasi Aplikasi ---
 async function boot() {
@@ -41,6 +42,9 @@ async function boot() {
 
   // 5. Init Matrix Rain background
   initMatrixRain('matrix-canvas');
+
+  // 10. Init Command Palette
+  initCommandPalette();
 
   // 6. Sound toggle button
   const soundBtn = document.getElementById('btn-sound-toggle');

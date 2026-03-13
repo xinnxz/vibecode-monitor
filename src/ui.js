@@ -238,81 +238,9 @@ export async function initUI(updateGlobeVisuals) {
   }
 
   // --- Keyboard Nav for Provider Chips ---
-  if (providerChipsContainer) {
-    providerChipsContainer.addEventListener('keydown', (e) => {
-      const activeElement = document.activeElement;
-      if (!activeElement || !activeElement.classList.contains('provider-chip')) return;
-      
-      const chips = Array.from(providerChipsContainer.querySelectorAll('.provider-chip'));
-      const index = chips.indexOf(activeElement);
-      
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = (index + 1) % chips.length;
-        
-        // Roving tabindex: remove 0 from current, set to next
-        chips.forEach(c => c.setAttribute('tabindex', '-1'));
-        chips[nextIndex].setAttribute('tabindex', '0');
-        chips[nextIndex].focus();
-        
-        // Auto-select the newly focused chip
-        selectedProviders.clear();
-        chips.forEach(c => c.classList.remove('active'));
-        chips[nextIndex].click();
-        
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = (index - 1 + chips.length) % chips.length;
-        
-        // Roving tabindex: remove 0 from current, set to prev
-        chips.forEach(c => c.setAttribute('tabindex', '-1'));
-        chips[prevIndex].setAttribute('tabindex', '0');
-        chips[prevIndex].focus();
-        
-        // Auto-select the newly focused chip
-        selectedProviders.clear();
-        chips.forEach(c => c.classList.remove('active'));
-        chips[prevIndex].click();
-        
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        activeElement.click();
-      } else if (e.key === 'Tab') {
-        // Allow normal Tab flow (will go to Status)
-        return;
-      }
-    });
-  }
+  // (Removed per user request to restore standard Tab flow)
 
-  // --- Smart Navigation into Provider Chips ---
-  if (inputName) {
-    inputName.addEventListener('keydown', (e) => {
-      // If ArrowDown is pressed in the name input, jump to the first provider chip
-      if (e.key === 'ArrowDown' && providerChipsContainer) {
-        e.preventDefault();
-        const firstChip = providerChipsContainer.querySelector('.provider-chip');
-        if (firstChip) {
-          firstChip.focus();
-          
-          // Auto-select the first chip when entering
-          selectedProviders.clear();
-          providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
-          firstChip.click();
-        }
-      }
-    });
-  }
-
-  if (inputStatus) {
-    inputStatus.addEventListener('keydown', (e) => {
-      // If Shift+Tab or ArrowUp is pressed while on Status, jump to the last provider chip
-      if (e.key === 'Tab' && e.shiftKey && providerChipsContainer) {
-        e.preventDefault();
-        const chips = providerChipsContainer.querySelectorAll('.provider-chip');
-        if (chips.length > 0) chips[chips.length - 1].focus();
-      }
-    });
-  }
+  // --- Bulk Actions ---
 
   if (inputNotes) {
     inputNotes.addEventListener('keydown', (e) => {
@@ -931,11 +859,11 @@ function populateProviderDropdowns() {
 function populateProviderChips() {
   if (!providerChipsContainer) return;
 
-  providerChipsContainer.innerHTML = PROVIDERS.filter(p => p.id !== 'other').map((p, index) =>
-    `<div class="provider-chip" data-provider="${p.id}" tabindex="${index === 0 ? '0' : '-1'}" style="--prov-color: ${p.color}">
+  providerChipsContainer.innerHTML = PROVIDERS.filter(p => p.id !== 'other').map((p) =>
+    `<button type="button" class="provider-chip" data-provider="${p.id}" style="--prov-color: ${p.color}">
       <span class="provider-icon">${p.svgIcon}</span>
       <span>${p.name}</span>
-    </div>`
+    </button>`
   ).join('');
 
   // Event delegation untuk toggle chips
@@ -1030,12 +958,7 @@ function closeModal() {
   accountForm.reset();
   selectedProviders.clear();
   if (providerChipsContainer) {
-    const chips = providerChipsContainer.querySelectorAll('.provider-chip');
-    chips.forEach((c, index) => {
-      c.classList.remove('active');
-      // Reset roving tabindex so the first chip is always the first stop next time
-      c.setAttribute('tabindex', index === 0 ? '0' : '-1');
-    });
+    providerChipsContainer.querySelectorAll('.provider-chip').forEach(c => c.classList.remove('active'));
   }
   if (inputNotes) inputNotes.value = '';
 }

@@ -213,6 +213,22 @@ NET: UPLINK_SECURE
       </div>
     </aside>
 
+    <!-- Command Palette (Ctrl+K) -->
+    <div id="cmd-palette-overlay" class="modal-overlay hidden">
+      <div id="cmd-palette" class="cmd-palette">
+        <div class="cmd-input-wrapper">
+          <svg class="cmd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input type="text" id="cmd-input" placeholder="Search accounts or type '>' for commands..." autocomplete="off" spellcheck="false" />
+          <span class="cmd-shortcut">esc</span>
+        </div>
+        <div id="cmd-results" class="cmd-results">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
     <!-- Modal -->
     <div id="modal-overlay" class="modal-overlay hidden">
       <div class="modal" id="modal">
