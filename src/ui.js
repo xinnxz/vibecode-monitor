@@ -318,6 +318,38 @@ export async function initUI(updateGlobeVisuals) {
  */
 function renderStats() {
   const stats = getStats();
+  const accounts = getAccounts();
+
+  // Build provider distribution data
+  const providerCounts = {};
+  accounts.forEach(a => {
+    const provArr = Array.isArray(a.provider) ? a.provider : [];
+    provArr.forEach(pid => {
+      providerCounts[pid] = (providerCounts[pid] || 0) + 1;
+    });
+  });
+
+  // Build the horizontal stacked bar segments
+  const totalProviderEntries = Object.values(providerCounts).reduce((s, c) => s + c, 0);
+  let providerBarHtml = '';
+  
+  if (totalProviderEntries > 0) {
+    const segments = Object.entries(providerCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([pid, count]) => {
+        const p = getProvider(pid);
+        const pct = Math.round((count / totalProviderEntries) * 100);
+        const color = p?.color || '#64748B';
+        const name = p?.name || pid;
+        return `<div class="prov-bar-seg" style="width:${pct}%;background:${color}" title="${name}: ${count} (${pct}%)"></div>`;
+      }).join('');
+
+    providerBarHtml = `
+      <div class="prov-bar-container">
+        <div class="prov-bar-track">${segments}</div>
+      </div>
+    `;
+  }
 
   statsBarEl.innerHTML = `
     <div class="stat-item total">
@@ -341,6 +373,7 @@ function renderStats() {
       <span class="stat-prefix">]</span>
       <span class="stat-value">${stats.limited}</span>
     </div>
+    ${providerBarHtml}
   `;
 }
 
@@ -773,6 +806,14 @@ function updateCountdowns() {
               try {
                 await editAccount(accountId, { status: 'available' });
                 addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
+                
+                // Visual celebration: green flash on the card
+                if (card) {
+                  card.classList.add('auto-refresh-flash');
+                  card.addEventListener('animationend', () => {
+                    card.classList.remove('auto-refresh-flash');
+                  }, { once: true });
+                }
               } catch (err) {
                 console.error("Auto-status update failed:", err);
               }
@@ -888,7 +929,7 @@ function populateProviderChips() {
 /**
  * Buka modal form.
  */
-function openModal(editId = null) {
+export function openModal(editId = null) {
   accountForm.reset();
   inputId.value = '';
   selectedProviders.clear();
@@ -1071,7 +1112,7 @@ function closeHistoryModal() {
 }
 
 // Settings Modal
-function openSettingsModal() {
+export function openSettingsModal() {
   const config = getWebhookConfig();
   if (inputDiscordUrl) inputDiscordUrl.value = config.discordUrl;
   if (inputTelegramToken) inputTelegramToken.value = config.telegramToken;

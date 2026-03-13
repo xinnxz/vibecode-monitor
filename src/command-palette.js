@@ -1,194 +1,294 @@
-import { getAccounts } from './accounts.js';
-import { openModal, renderAccountList } from './ui.js';
-import { addLog } from './activity-log.js';
-import { notify } from './notifications.js';
+/**
+ * command-palette.js — Command Palette Module (Ctrl+K)
+ *
+ * Fitur utama:
+ * 1. Buka/tutup palette via Ctrl+K atau Cmd+K
+ * 2. Fuzzy search nama akun (langsung menampilkan hasil)
+ * 3. Command mode: ketik "> add", "> clear", "> settings" untuk aksi cepat
+ * 4. Navigasi hasil pakai Arrow Up/Down + Enter
+ * 5. Klik hasil untuk eksekusi aksi (Edit akun / jalankan command)
+ */
 
-let isOpen = false;
-let selectedIndex = -1;
+import { getAccounts } from './accounts.js';
+import { getProvider } from './providers.js';
+import { playClick } from './sounds.js';
+
+// DOM refs
+let overlay, input, resultsEl;
+
+// State
+let activeIndex = -1;
 let currentResults = [];
 
-export function initCommandPalette() {
-  const overlay = document.getElementById('cmd-palette-overlay');
-  const input = document.getElementById('cmd-input');
-  const resultsContainer = document.getElementById('cmd-results');
-  if (!overlay || !input || !resultsContainer) return;
+// Callback references (diset dari luar via init)
+let onEditAccount = null;
+let onOpenAddModal = null;
+let onClearNotifications = null;
+let onOpenSettings = null;
 
-  // Global keydown to launch
+/**
+ * Inisialisasi Command Palette.
+ * Dipanggil sekali dari main.js atau ui.js.
+ *
+ * @param {Object} callbacks
+ *   - editAccount(id): buka modal edit untuk akun tertentu
+ *   - openAddModal(): buka modal tambah akun baru
+ *   - clearNotifications(): bersihkan semua notifikasi
+ *   - openSettings(): buka modal settings
+ */
+export function initCommandPalette(callbacks = {}) {
+  overlay = document.getElementById('cmd-overlay');
+  input = document.getElementById('cmd-input');
+  resultsEl = document.getElementById('cmd-results');
+
+  if (!overlay || !input || !resultsEl) return;
+
+  onEditAccount = callbacks.editAccount || null;
+  onOpenAddModal = callbacks.openAddModal || null;
+  onClearNotifications = callbacks.clearNotifications || null;
+  onOpenSettings = callbacks.openSettings || null;
+
+  // Global shortcut: Ctrl+K / Cmd+K
   document.addEventListener('keydown', (e) => {
-    // Cmd+K or Ctrl+K
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
-      togglePalette(true);
-    }
-    
-    // Esc to close
-    if (e.key === 'Escape' && isOpen) {
-      togglePalette(false);
+      toggle();
     }
   });
 
-  // Handle input changes
-  input.addEventListener('input', (e) => {
-    handleSearch(e.target.value, resultsContainer);
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
   });
 
-  // Handle keyboard navigation inside palette
+  // Input events
+  input.addEventListener('input', () => {
+    search(input.value);
+  });
+
   input.addEventListener('keydown', (e) => {
-    if (!isOpen) return;
-
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'Escape') {
       e.preventDefault();
-      selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
-      renderResults(resultsContainer);
+      close();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection(1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      selectedIndex = Math.max(selectedIndex - 1, 0);
-      renderResults(resultsContainer);
+      moveSelection(-1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      executeAction();
+      executeSelected();
     }
   });
-
-  // Click outside to close
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) togglePalette(false);
-  });
 }
 
-function togglePalette(show) {
-  isOpen = show;
-  const overlay = document.getElementById('cmd-palette-overlay');
-  const input = document.getElementById('cmd-input');
-  const resultsContainer = document.getElementById('cmd-results');
-
-  if (show) {
-    overlay.classList.remove('hidden');
-    input.value = '';
-    handleSearch('', resultsContainer);
-    setTimeout(() => input.focus(), 100);
+/**
+ * Toggle Command Palette visibility.
+ */
+function toggle() {
+  if (overlay.classList.contains('hidden')) {
+    open();
   } else {
-    overlay.classList.add('hidden');
-    input.blur();
+    close();
   }
 }
 
-function handleSearch(query, container) {
+/**
+ * Buka Command Palette.
+ */
+function open() {
+  overlay.classList.remove('hidden');
+  input.value = '';
+  resultsEl.innerHTML = '';
+  activeIndex = -1;
+  currentResults = [];
+
+  // Show default suggestions
+  showDefaultSuggestions();
+
+  setTimeout(() => input.focus(), 50);
+}
+
+/**
+ * Tutup Command Palette.
+ */
+function close() {
+  overlay.classList.add('hidden');
+  input.value = '';
+  resultsEl.innerHTML = '';
+  activeIndex = -1;
+  currentResults = [];
+}
+
+/**
+ * Tampilkan saran default (commands) saat palette baru dibuka.
+ */
+function showDefaultSuggestions() {
+  const commands = getCommandList();
+  currentResults = commands;
+  renderResults(commands);
+}
+
+/**
+ * Cari akun atau command berdasarkan query.
+ */
+function search(query) {
   const q = query.trim().toLowerCase();
-  selectedIndex = 0;
-  
-  if (q.startsWith('>')) {
-    // Command Mode
-    const cmdStr = q.substring(1).trim();
-    currentResults = getCommands(cmdStr);
-  } else {
-    // Search Mode
-    currentResults = getAccountResults(q);
-  }
 
-  renderResults(container);
-}
-
-function getCommands(query) {
-  const allCommands = [
-    { type: 'command', id: 'add', title: 'Add New Account', subtitle: '> add', icon: '➕' },
-    { type: 'command', id: 'clear', title: 'Clear Notifications', subtitle: '> clear', icon: '🗑️' }
-  ];
-
-  if (!query) return allCommands;
-  return allCommands.filter(c => c.id.includes(query) || c.title.toLowerCase().includes(query));
-}
-
-function getAccountResults(query) {
-  const accounts = getAccounts();
-  
-  // Custom accounts mapped to result items
-  let mapped = accounts.map(a => ({
-    type: 'account',
-    id: a.id,
-    title: a.name,
-    subtitle: `Provider: ${Array.isArray(a.provider) ? a.provider.join(', ') : (a.provider || 'none')} — Status: ${a.status}`,
-    icon: a.status === 'available' ? '🟢' : '🔴',
-    accountRef: a
-  }));
-
-  if (query) {
-    mapped = mapped.filter(r => r.title.toLowerCase().includes(query));
-  }
-  
-  // Limit to 8 results for cleaner UI
-  return mapped.slice(0, 8);
-}
-
-function renderResults(container) {
-  if (currentResults.length === 0) {
-    container.innerHTML = '<div class="cmd-item empty"><div class="cmd-item-info"><span>No results found</span></div></div>';
+  if (!q) {
+    showDefaultSuggestions();
     return;
   }
 
-  container.innerHTML = currentResults.map((res, index) => {
-    const isSelected = index === selectedIndex ? 'selected' : '';
+  // Command mode: query starts with ">"
+  if (q.startsWith('>')) {
+    const cmdQuery = q.slice(1).trim();
+    const commands = getCommandList().filter(c =>
+      c.title.toLowerCase().includes(cmdQuery) ||
+      c.subtitle.toLowerCase().includes(cmdQuery)
+    );
+    currentResults = commands;
+    renderResults(commands);
+    return;
+  }
+
+  // Account search mode
+  const accounts = getAccounts();
+  const matchedAccounts = accounts
+    .filter(a => a.name.toLowerCase().includes(q))
+    .slice(0, 8)
+    .map(a => {
+      const provArr = Array.isArray(a.provider) ? a.provider : [];
+      const provNames = provArr.map(pid => {
+        const p = getProvider(pid);
+        return p ? p.name : pid;
+      }).join(', ');
+
+      return {
+        type: 'account',
+        id: a.id,
+        icon: '📋',
+        title: a.name,
+        subtitle: provNames || 'No provider',
+        status: a.status,
+        action: () => {
+          if (onEditAccount) onEditAccount(a.id);
+        },
+      };
+    });
+
+  // Also show matching commands
+  const matchedCommands = getCommandList().filter(c =>
+    c.title.toLowerCase().includes(q)
+  );
+
+  currentResults = [...matchedAccounts, ...matchedCommands];
+  renderResults(currentResults);
+}
+
+/**
+ * Daftar command yang bisa dijalankan.
+ */
+function getCommandList() {
+  return [
+    {
+      type: 'command',
+      icon: '➕',
+      title: 'New Account',
+      subtitle: 'Add a new monitored account',
+      action: () => { if (onOpenAddModal) onOpenAddModal(); },
+    },
+    {
+      type: 'command',
+      icon: '🔔',
+      title: 'Clear Notifications',
+      subtitle: 'Clear all notification history',
+      action: () => { if (onClearNotifications) onClearNotifications(); },
+    },
+    {
+      type: 'command',
+      icon: '⚙️',
+      title: 'Settings',
+      subtitle: 'Open webhook & notification settings',
+      action: () => { if (onOpenSettings) onOpenSettings(); },
+    },
+  ];
+}
+
+/**
+ * Render hasil pencarian ke DOM.
+ */
+function renderResults(results) {
+  activeIndex = results.length > 0 ? 0 : -1;
+
+  resultsEl.innerHTML = results.map((r, i) => {
+    const activeClass = i === 0 ? ' active' : '';
+    const badgeHtml = r.status
+      ? `<span class="cmd-result-badge ${r.status}">${r.status}</span>`
+      : '';
+
     return `
-      <div class="cmd-item ${isSelected}" data-index="${index}">
-        <span class="cmd-item-icon">${res.icon}</span>
-        <div class="cmd-item-info">
-          <span class="cmd-item-title">${res.title}</span>
-          <span class="cmd-item-subtitle">${res.subtitle}</span>
+      <div class="cmd-result-item${activeClass}" data-index="${i}">
+        <span class="cmd-result-icon">${r.icon}</span>
+        <div class="cmd-result-text">
+          <div class="cmd-result-title">${escapeHtml(r.title)}</div>
+          <div class="cmd-result-subtitle">${escapeHtml(r.subtitle)}</div>
         </div>
+        ${badgeHtml}
       </div>
     `;
   }).join('');
 
-  // Auto-scroll selected item into view
-  const selectedEl = container.querySelector('.cmd-item.selected');
-  if (selectedEl) {
-    selectedEl.scrollIntoView({ block: 'nearest' });
-  }
-
-  // Bind click events
-  const items = container.querySelectorAll('.cmd-item');
-  items.forEach(item => {
-    item.addEventListener('click', (e) => {
-      const idx = parseInt(e.currentTarget.dataset.index);
-      if (!isNaN(idx)) {
-        selectedIndex = idx;
-        executeAction();
-      }
-    });
-    
-    // Mouse hover updates selected index
-    item.addEventListener('mouseenter', (e) => {
-      const idx = parseInt(e.currentTarget.dataset.index);
-      if (!isNaN(idx) && selectedIndex !== idx) {
-        selectedIndex = idx;
-        renderResults(container);
+  // Click handler for each result
+  resultsEl.querySelectorAll('.cmd-result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.index, 10);
+      if (currentResults[idx]) {
+        playClick();
+        close();
+        currentResults[idx].action();
       }
     });
   });
 }
 
-function executeAction() {
-  if (selectedIndex < 0 || selectedIndex >= currentResults.length) return;
-  const item = currentResults[selectedIndex];
-  
-  togglePalette(false);
+/**
+ * Pindahkan selection atas/bawah.
+ */
+function moveSelection(delta) {
+  if (currentResults.length === 0) return;
 
-  if (item.type === 'command') {
-    if (item.id === 'add') {
-      openModal();
-    } else if (item.id === 'clear') {
-      const logList = document.getElementById('log-list');
-      const logBadge = document.getElementById('log-badge');
-      if (logList) logList.innerHTML = '';
-      if (logBadge) {
-        logBadge.textContent = '0';
-        logBadge.classList.add('hidden');
-      }
-      addLog('SYSTEM', 'logs cleared via terminal');
-      notify('System Logs', 'All logs and notifications cleared.', 'success');
-    }
-  } else if (item.type === 'account') {
-    // Open modal directly on edit
-    openModal(item.id);
+  // Remove current active
+  const items = resultsEl.querySelectorAll('.cmd-result-item');
+  if (items[activeIndex]) items[activeIndex].classList.remove('active');
+
+  // Calculate new index (wrap around)
+  activeIndex = (activeIndex + delta + currentResults.length) % currentResults.length;
+
+  // Set new active
+  if (items[activeIndex]) {
+    items[activeIndex].classList.add('active');
+    items[activeIndex].scrollIntoView({ block: 'nearest' });
   }
+}
+
+/**
+ * Jalankan aksi dari item yang sedang aktif.
+ */
+function executeSelected() {
+  if (activeIndex >= 0 && activeIndex < currentResults.length) {
+    playClick();
+    close();
+    currentResults[activeIndex].action();
+  }
+}
+
+/**
+ * Simple HTML escape utility.
+ */
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
 }

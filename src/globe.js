@@ -77,6 +77,8 @@ let labelSprites = [];
 let timeValue = 100;
 let textures = {};
 let isUserDragging = false; // Flag: true saat user hold/drag globe
+let isHoveringGlobe = false; // Flag: true saat mouse hover di atas canvas
+let pingRings = []; // Temporary ping ring meshes
 
 // Shader uniforms untuk scan line animation
 let uniforms;
@@ -191,6 +193,10 @@ export function initGlobe(container) {
   // --- Events ---
   window.addEventListener('resize', onResize);
 
+  // Mouse hover detection for globe slow-down
+  renderer.domElement.addEventListener('mouseenter', () => { isHoveringGlobe = true; });
+  renderer.domElement.addEventListener('mouseleave', () => { isHoveringGlobe = false; });
+
   // --- Start Animation ---
   animate();
 
@@ -199,6 +205,7 @@ export function initGlobe(container) {
     camera,
     renderer,
     updateVisuals: updateAccountVisuals,
+    shootPing,
   };
 }
 
@@ -843,6 +850,45 @@ function createLabelSprite(text, city, radius) {
 }
 
 // ============================================================
+// PING RING EFFECT (Interactive Globe Events)
+// ============================================================
+
+/**
+ * Shoot a temporary expanding ring ("ping") at a random city on the globe.
+ * Called when accounts are added, edited, or auto-synced.
+ */
+function shootPing() {
+  if (!earthGroup) return;
+
+  // Pick a random city from the world cities array
+  const city = WORLD_CITIES[Math.floor(Math.random() * WORLD_CITIES.length)];
+  const R = CONFIG.earth.radius;
+  const pos = lon2xyz(R + 0.5, city.lon, city.lat);
+
+  // Create a ring geometry
+  const ringGeo = new THREE.RingGeometry(1.5, 2.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffcc,
+    transparent: true,
+    opacity: 1,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  ringMesh.position.set(pos.x, pos.y, pos.z);
+
+  // Orient ring to face outward from globe center
+  ringMesh.lookAt(0, 0, 0);
+
+  // Track animation state
+  ringMesh.userData.progress = 0;
+
+  earthGroup.add(ringMesh);
+  pingRings.push(ringMesh);
+}
+
+// ============================================================
 // ENTRY ANIMATION
 // ============================================================
 
@@ -866,8 +912,27 @@ function animate() {
   controls.update();
 
   // Rotate earth (STOP saat user sedang drag/hold globe)
+  // Slow down rotation when hovering
   if (CONFIG.earth.rotateSpeed && earthGroup && !isUserDragging) {
-    earthGroup.rotation.y += CONFIG.earth.rotateSpeed;
+    const speed = isHoveringGlobe ? CONFIG.earth.rotateSpeed * 0.3 : CONFIG.earth.rotateSpeed;
+    earthGroup.rotation.y += speed;
+  }
+
+  // Animate ping rings (expand + fade out)
+  for (let i = pingRings.length - 1; i >= 0; i--) {
+    const ring = pingRings[i];
+    ring.userData.progress += 0.015;
+    const p = ring.userData.progress;
+    const scale = 1 + p * 3;
+    ring.scale.set(scale, scale, scale);
+    ring.material.opacity = Math.max(0, 1 - p);
+    
+    if (p >= 1) {
+      earthGroup.remove(ring);
+      ring.geometry.dispose();
+      ring.material.dispose();
+      pingRings.splice(i, 1);
+    }
   }
 
   // Satellite rotation

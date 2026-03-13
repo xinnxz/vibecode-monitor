@@ -15,8 +15,8 @@
 
 import './style.css';
 import { initGlobe } from './globe.js';
-import { initUI } from './ui.js';
-import { requestPermission, initNotifications } from './notifications.js';
+import { initUI, openModal, openSettingsModal } from './ui.js';
+import { requestPermission, initNotifications, clearNotifications } from './notifications.js';
 import { initActivityLog } from './activity-log.js';
 import { initMatrixRain } from './matrix-rain.js';
 import { toggleSound } from './sounds.js';
@@ -35,7 +35,11 @@ async function boot() {
   const globe = initGlobe(container);
 
   // 3. Init UI (async: fetch data dari Supabase)
-  await initUI(globe.updateVisuals);
+  // Wrap updateVisuals to also trigger a globe ping on data changes
+  await initUI((accounts) => {
+    globe.updateVisuals(accounts);
+    globe.shootPing();
+  });
 
   // 4. Init Activity Log
   initActivityLog();
@@ -43,8 +47,13 @@ async function boot() {
   // 5. Init Matrix Rain background
   initMatrixRain('matrix-canvas');
 
-  // 10. Init Command Palette
-  initCommandPalette();
+  // 5.5 Init Command Palette (Ctrl+K)
+  initCommandPalette({
+    editAccount: (id) => openModal(id),
+    openAddModal: () => openModal(),
+    clearNotifications: () => clearNotifications(),
+    openSettings: () => openSettingsModal(),
+  });
 
   // 6. Sound toggle button
   const soundBtn = document.getElementById('btn-sound-toggle');

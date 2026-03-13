@@ -119,7 +119,7 @@ function toggleNotifPanel() {
 /**
  * Clear semua notifikasi.
  */
-function clearNotifications() {
+export function clearNotifications() {
   notifications = [];
   updateBadge();
   renderNotifList();
