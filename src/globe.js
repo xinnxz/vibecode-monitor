@@ -197,6 +197,27 @@ export function initGlobe(container) {
   renderer.domElement.addEventListener('mouseenter', () => { isHoveringGlobe = true; });
   renderer.domElement.addEventListener('mouseleave', () => { isHoveringGlobe = false; });
 
+  // Raycaster for click interactivity (shoot ping at cursor)
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    if (!earthMesh) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(earthMesh, false);
+    
+    if (intersects.length > 0) {
+      // Hit the globe! Convert world point to earthGroup local point
+      const localPoint = earthGroup.worldToLocal(intersects[0].point.clone());
+      // Push it slightly outward to avoid z-fighting
+      localPoint.normalize().multiplyScalar(CONFIG.earth.radius + 0.5);
+      shootPing({ count: 1, pos: localPoint, color: 0x38bdf8 });
+    }
+  });
+
   // --- Start Animation ---
   animate();
 
@@ -854,38 +875,48 @@ function createLabelSprite(text, city, radius) {
 // ============================================================
 
 /**
- * Shoot a temporary expanding ring ("ping") at a random city on the globe.
- * Called when accounts are added, edited, or auto-synced.
+ * Shoot a temporary expanding ring ("ping") at a specific point or random city.
+ * Called when accounts are added, edited, auto-synced, or globe is clicked.
  */
-function shootPing() {
+function shootPing({ count = 3, pos = null, color = null } = {}) {
   if (!earthGroup) return;
 
-  // Pick a random city from the world cities array
-  const city = WORLD_CITIES[Math.floor(Math.random() * WORLD_CITIES.length)];
-  const R = CONFIG.earth.radius;
-  const pos = lon2xyz(R + 0.5, city.lon, city.lat);
+  // Determine starting position
+  let startPos = pos;
+  if (!startPos) {
+    const city = WORLD_CITIES[Math.floor(Math.random() * WORLD_CITIES.length)];
+    const R = CONFIG.earth.radius;
+    startPos = lon2xyz(R + 0.5, city.lon, city.lat);
+  }
 
-  // Create a ring geometry
-  const ringGeo = new THREE.RingGeometry(1.5, 2.5, 32);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffcc,
-    transparent: true,
-    opacity: 1,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
+  const colors = [0x00ffcc, 0x0cd1eb, 0x38bdf8, 0x34d399, 0xfbbf24];
 
-  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-  ringMesh.position.set(pos.x, pos.y, pos.z);
+  // Shoot multiple staggered rings
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      // Much larger, thicker ring
+      const ringGeo = new THREE.RingGeometry(2, 4.5, 64);
+      
+      const ringColor = color || colors[Math.floor(Math.random() * colors.length)];
+      
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ringColor,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending // Glow effect
+      });
 
-  // Orient ring to face outward from globe center
-  ringMesh.lookAt(0, 0, 0);
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.copy(startPos);
+      ringMesh.lookAt(0, 0, 0); // Face outward
+      ringMesh.userData.progress = 0;
 
-  // Track animation state
-  ringMesh.userData.progress = 0;
-
-  earthGroup.add(ringMesh);
-  pingRings.push(ringMesh);
+      earthGroup.add(ringMesh);
+      pingRings.push(ringMesh);
+    }, i * 250); // 250ms stagger
+  }
 }
 
 // ============================================================
@@ -918,14 +949,18 @@ function animate() {
     earthGroup.rotation.y += speed;
   }
 
-  // Animate ping rings (expand + fade out)
+  // Animate ping rings (expand + fade out with additive blending logic)
   for (let i = pingRings.length - 1; i >= 0; i--) {
     const ring = pingRings[i];
-    ring.userData.progress += 0.015;
+    ring.userData.progress += 0.012; // Slower expansion
     const p = ring.userData.progress;
-    const scale = 1 + p * 3;
+    
+    // Expand much larger (up to 7x size)
+    const scale = 1 + p * 6;
     ring.scale.set(scale, scale, scale);
-    ring.material.opacity = Math.max(0, 1 - p);
+    
+    // Smooth fade out using power curve
+    ring.material.opacity = Math.max(0, 1 - Math.pow(p, 1.5));
     
     if (p >= 1) {
       earthGroup.remove(ring);

@@ -152,6 +152,7 @@ html, body {
 /* Stats Bar — Hacker Terminal Style */
 .stats-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -297,6 +298,10 @@ html, body {
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
+  
+  /* Performance optimizations for scroll lag */
+  will-change: transform, backdrop-filter;
+  transform: translateZ(0); /* Force GPU acceleration */
 }
 
 .panel-header {
@@ -377,6 +382,11 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 16px 24px;
+  
+  /* Scroll performance optimizations */
+  overscroll-behavior-y: contain;
+  will-change: scroll-position;
+  transform: translateZ(0); /* Create separate paint layer */
 }
 
 /* Custom Hacker Scrollbar */
@@ -2124,11 +2134,13 @@ html, body {
   justify-content: center;
   padding-top: 18vh;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.15s ease;
 }
 
 .cmd-overlay:not(.hidden) {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .cmd-palette {
