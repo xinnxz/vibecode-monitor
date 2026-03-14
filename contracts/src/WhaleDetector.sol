@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.30;
 
 // ============================================================
 // WhaleDetector.sol — SomniaScan
@@ -15,10 +15,13 @@ pragma solidity ^0.8.24;
 // 3. _onEvent() emit WhaleAlert → frontend bereaksi dengan
 //    animasi Red Wave Pulse + Spatial Audio Siren.
 //
-// TIDAK PERLU:
-// - Backend server/bot untuk polling
-// - Keeper bot untuk monitoring
-// - Off-chain cron job
+// _onEvent signature (sesuai SomniaEventHandler v0.1.6):
+//   _onEvent(address emitter, bytes32[] calldata eventTopics, bytes calldata data)
+//
+// eventTopics[0] = event signature hash (keccak256("Transfer(address,address,uint256)"))
+// eventTopics[1] = from address (indexed)
+// eventTopics[2] = to address (indexed)
+// data           = ABI encoded non-indexed params (amount)
 // ============================================================
 
 import "@somnia-chain/reactivity-contracts/contracts/SomniaEventHandler.sol";
@@ -41,11 +44,6 @@ contract WhaleDetector is SomniaEventHandler, Ownable {
     // ============================================================
 
     /// @notice Dipanggil saat transaksi whale terdeteksi.
-    /// @param from     Alamat pengirim
-    /// @param to       Alamat penerima
-    /// @param amount   Jumlah token yang dikirim (dalam wei)
-    /// @param alertId  ID urutan alert (untuk indexing di frontend)
-    /// @param timestamp Waktu deteksi (block.timestamp)
     event WhaleAlert(
         address indexed from,
         address indexed to,
@@ -71,29 +69,32 @@ contract WhaleDetector is SomniaEventHandler, Ownable {
      * @notice Fungsi utama Reactivity. Dipanggil OTOMATIS oleh
      *         Somnia node saat event yang sudah di-subscribe terjadi.
      *
-     * @dev eventData berisi ABI-encoded: (address from, address to, uint256 amount)
-     *      yang berasal dari event Transfer ERC-20 yang kita observe.
-     *
-     * @param eventData Raw ABI-encoded event data dari Somnia validator.
+     * @param emitter       Kontrak yang emit event (Token contract address)
+     * @param eventTopics   [0] = event sig hash, [1] = from (indexed), [2] = to (indexed)
+     * @param data          ABI-encoded non-indexed params: uint256 amount
      */
-    function _onEvent(bytes memory eventData) internal override {
-        // Decode data transfer yang diterima dari Reactivity
-        (address from, address to, uint256 amount) = abi.decode(
-            eventData,
-            (address, address, uint256)
-        );
+    function _onEvent(
+        address emitter,
+        bytes32[] calldata eventTopics,
+        bytes calldata data
+    ) internal override {
+        // Suppress unused variable warning
+        emitter;
+
+        // Decode "from" dan "to" dari eventTopics (indexed params)
+        // eventTopics[0] = keccak256("Transfer(address,address,uint256)")
+        // eventTopics[1] = address from (padded to 32 bytes)
+        // eventTopics[2] = address to (padded to 32 bytes)
+        address from = address(uint160(uint256(eventTopics[1])));
+        address to   = address(uint160(uint256(eventTopics[2])));
+
+        // Decode "amount" dari data (non-indexed)
+        uint256 amount = abi.decode(data, (uint256));
 
         // Cek apakah transaksi ini melampaui batas whale
         if (amount >= whaleThreshold) {
             totalWhaleAlerts++;
-
-            emit WhaleAlert(
-                from,
-                to,
-                amount,
-                totalWhaleAlerts,
-                block.timestamp
-            );
+            emit WhaleAlert(from, to, amount, totalWhaleAlerts, block.timestamp);
         }
     }
 
@@ -119,15 +120,5 @@ contract WhaleDetector is SomniaEventHandler, Ownable {
     /// @notice Kembalikan threshold saat ini dalam format STT (bukan wei).
     function getThresholdInSTT() external view returns (uint256) {
         return whaleThreshold / 1 ether;
-    }
-
-    // ============================================================
-    // TEST HELPER (dapat dihapus sebelum mainnet deploy)
-    // ============================================================
-
-    /// @notice Simulate _onEvent() untuk keperluan unit testing lokal.
-    ///         Di jaringan Somnia, ini dipanggil otomatis oleh Reactivity.
-    function simulateEvent(bytes memory eventData) external {
-        _onEvent(eventData);
     }
 }

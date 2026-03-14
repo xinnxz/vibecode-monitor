@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.30;
 
 // ============================================================
 // AlertEngine.sol — SomniaScan
 //
 // Engine untuk membuat, mengelola, dan mengeksekusi custom alert
 // rules secara on-chain. User bisa menetapkan kondisi:
-//   "Jika [event X] dari [address Y] dengan [amount > Z] → Alert"
+//   "Jika Transfer dari [address Y] dengan [amount > Z] → Alert"
 //
-// Somnia Reactivity akan otomatis memicu _onEvent() saat
-// kondisi subscribe terpenuhi, kemudian contract ini mengevaluasi
-// semua rules yang relevan dan emit alert untuk yang cocok.
-//
-// Ini adalah "Core Reactivity Use Case" yang menunjukkan
-// desentralisasi penuh: tidak ada backend yang perlu memantau
-// kondisi alert — semua dijalankan di level blockchain.
+// Menggunakan SomniaEventHandler v0.1.6:
+//   _onEvent(address emitter, bytes32[] calldata eventTopics, bytes calldata data)
+//   - eventTopics[0] = event signature hash
+//   - eventTopics[1] = from address (indexed, padded 32 bytes)
+//   - eventTopics[2] = to address (indexed, padded 32 bytes)
+//   - data           = abi.encode(uint256 amount)
 // ============================================================
 
 import "@somnia-chain/reactivity-contracts/contracts/SomniaEventHandler.sol";
@@ -25,7 +24,6 @@ contract AlertEngine is SomniaEventHandler, Ownable {
     // TYPES
     // ============================================================
 
-    /// @notice Jenis kondisi yang didukung untuk alert trigger
     enum ConditionType {
         AMOUNT_GREATER_THAN,    // amount > threshold
         AMOUNT_LESS_THAN,       // amount < threshold
@@ -34,16 +32,15 @@ contract AlertEngine is SomniaEventHandler, Ownable {
         ANY_TRANSFER            // setiap transfer
     }
 
-    /// @notice Satu aturan alert yang dibuat oleh user
     struct AlertRule {
         uint256 id;
-        address owner;          // User yang membuat rule
+        address owner;
         ConditionType condition;
-        uint256 amountThreshold; // Dipakai jika condition adalah amount-based
-        address targetAddress;   // Dipakai jika condition adalah address-based
-        string message;          // Pesan yang akan ditampilkan di frontend
+        uint256 amountThreshold;
+        address targetAddress;
+        string message;
         bool isActive;
-        uint256 triggerCount;    // Berapa kali sudah trigger
+        uint256 triggerCount;
         uint256 createdAt;
     }
 
@@ -52,24 +49,15 @@ contract AlertEngine is SomniaEventHandler, Ownable {
     // ============================================================
 
     uint256 private _nextRuleId = 1;
-
-    /// @notice Semua rules yang ada. ruleId → AlertRule
     mapping(uint256 => AlertRule) public rules;
-
-    /// @notice Daftar rule ID milik setiap user
     mapping(address => uint256[]) public userRules;
-
-    /// @notice Total rule yang pernah dibuat
     uint256 public totalRulesCreated;
-
-    /// @notice Total alert yang pernah di-emit
     uint256 public totalAlertsEmitted;
 
     // ============================================================
     // EVENTS
     // ============================================================
 
-    /// @notice Dipanggil saat alert kondisi terpenuhi.
     event AlertTriggered(
         uint256 indexed ruleId,
         address indexed ruleOwner,
@@ -80,10 +68,7 @@ contract AlertEngine is SomniaEventHandler, Ownable {
         uint256 timestamp
     );
 
-    /// @notice Dipanggil saat rule baru dibuat.
     event RuleCreated(uint256 indexed ruleId, address indexed owner, string message);
-
-    /// @notice Dipanggil saat rule dinonaktifkan.
     event RuleDeactivated(uint256 indexed ruleId, address indexed owner);
 
     // ============================================================
@@ -93,67 +78,30 @@ contract AlertEngine is SomniaEventHandler, Ownable {
     constructor() Ownable(msg.sender) {}
 
     // ============================================================
-    // USER FUNCTIONS — Membuat & Mengelola Rules
+    // USER FUNCTIONS
     // ============================================================
 
-    /**
-     * @notice Buat alert rule baru "Amount > Threshold".
-     * @param threshold Jumlah minimum (wei) untuk memicu alert.
-     * @param message   Pesan yang tampil di SomniaScan frontend.
-     */
     function createAmountAlert(
         uint256 threshold,
         string calldata message
     ) external returns (uint256 ruleId) {
-        ruleId = _createRule(
-            msg.sender,
-            ConditionType.AMOUNT_GREATER_THAN,
-            threshold,
-            address(0),
-            message
-        );
+        ruleId = _createRule(msg.sender, ConditionType.AMOUNT_GREATER_THAN, threshold, address(0), message);
     }
 
-    /**
-     * @notice Buat alert rule baru "Transfer FROM address tertentu".
-     * @param watchedAddress Alamat yang ingin dipantau sebagai pengirim.
-     * @param message        Pesan yang tampil di SomniaScan frontend.
-     */
     function createFromAddressAlert(
         address watchedAddress,
         string calldata message
     ) external returns (uint256 ruleId) {
-        ruleId = _createRule(
-            msg.sender,
-            ConditionType.FROM_ADDRESS,
-            0,
-            watchedAddress,
-            message
-        );
+        ruleId = _createRule(msg.sender, ConditionType.FROM_ADDRESS, 0, watchedAddress, message);
     }
 
-    /**
-     * @notice Buat alert rule baru "Transfer TO address tertentu (watchlist dompet)".
-     * @param watchedAddress Alamat yang ingin dipantau sebagai penerima.
-     * @param message        Pesan yang tampil di SomniaScan frontend.
-     */
     function createToAddressAlert(
         address watchedAddress,
         string calldata message
     ) external returns (uint256 ruleId) {
-        ruleId = _createRule(
-            msg.sender,
-            ConditionType.TO_ADDRESS,
-            0,
-            watchedAddress,
-            message
-        );
+        ruleId = _createRule(msg.sender, ConditionType.TO_ADDRESS, 0, watchedAddress, message);
     }
 
-    /**
-     * @notice Nonaktifkan sebuah rule. Hanya owner rule yang bisa.
-     * @param ruleId ID rule yang akan dinonaktifkan.
-     */
     function deactivateRule(uint256 ruleId) external {
         AlertRule storage rule = rules[ruleId];
         require(rule.owner == msg.sender, "Bukan pemilik rule ini");
@@ -168,16 +116,21 @@ contract AlertEngine is SomniaEventHandler, Ownable {
 
     /**
      * @notice Auto-dipanggil oleh Somnia saat event Transfer terdeteksi.
-     * @dev Evaluasi semua rule aktif terhadap event yang masuk.
-     *      Jika cocok, emit AlertTriggered.
+     * @param emitter       Contract yang emit event (token address). Unused tapi wajib ada.
+     * @param eventTopics   EVM event topics (sig, from, to)
+     * @param data          ABI-encoded uint256 amount
      */
-    function _onEvent(bytes memory eventData) internal override {
-        (address from, address to, uint256 amount) = abi.decode(
-            eventData,
-            (address, address, uint256)
-        );
+    function _onEvent(
+        address emitter,
+        bytes32[] calldata eventTopics,
+        bytes calldata data
+    ) internal override {
+        emitter; // suppress unused warning
 
-        // Iterasi semua rules (di produksi, bisa dioptimasi dengan indexing)
+        address from = address(uint160(uint256(eventTopics[1])));
+        address to   = address(uint160(uint256(eventTopics[2])));
+        uint256 amount = abi.decode(data, (uint256));
+
         for (uint256 i = 1; i < _nextRuleId; i++) {
             AlertRule storage rule = rules[i];
             if (!rule.isActive) continue;
@@ -199,15 +152,7 @@ contract AlertEngine is SomniaEventHandler, Ownable {
             if (triggered) {
                 rule.triggerCount++;
                 totalAlertsEmitted++;
-                emit AlertTriggered(
-                    rule.id,
-                    rule.owner,
-                    from,
-                    to,
-                    amount,
-                    rule.message,
-                    block.timestamp
-                );
+                emit AlertTriggered(rule.id, rule.owner, from, to, amount, rule.message, block.timestamp);
             }
         }
     }
@@ -216,12 +161,10 @@ contract AlertEngine is SomniaEventHandler, Ownable {
     // VIEW FUNCTIONS
     // ============================================================
 
-    /// @notice Ambil semua rule ID milik satu user.
     function getUserRuleIds(address user) external view returns (uint256[] memory) {
         return userRules[user];
     }
 
-    /// @notice Ambil detail satu rule.
     function getRule(uint256 ruleId) external view returns (AlertRule memory) {
         return rules[ruleId];
     }
@@ -252,10 +195,5 @@ contract AlertEngine is SomniaEventHandler, Ownable {
         userRules[owner].push(ruleId);
         totalRulesCreated++;
         emit RuleCreated(ruleId, owner, message);
-    }
-
-    /// @notice Test helper — simulate _onEvent() secara langsung.
-    function simulateEvent(bytes memory eventData) external {
-        _onEvent(eventData);
     }
 }
