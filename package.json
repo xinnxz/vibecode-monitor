@@ -1,19 +1,17 @@
 {
-  "name": "antigravity-monitor",
+  "name": "somniascan",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "description": "SomniaScan — Reactive Blockchain Intelligence Platform for Somnia Network",
+  "workspaces": [
+    "contracts",
+    "frontend"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "vite": "^7.3.1"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.98.0",
-    "gsap": "^3.14.2",
-    "three": "^0.183.2"
+    "contracts:compile": "npm run compile --workspace=contracts",
+    "contracts:test": "npm run test --workspace=contracts",
+    "contracts:deploy": "npm run deploy --workspace=contracts",
+    "frontend:dev": "npm run dev --workspace=frontend",
+    "frontend:build": "npm run build --workspace=frontend"
   }
 }
