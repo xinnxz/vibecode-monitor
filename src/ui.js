@@ -312,6 +312,9 @@ export async function initUI(updateGlobeVisuals, focusCb) {
 
   // Start countdown timer via RAF (lebih smooth dari setInterval)
   startCountdownRAF();
+
+  // Initial immediate sync for accounts that are already READY on load
+  setTimeout(() => updateCountdowns(), 500);
 }
 
 /**
@@ -777,14 +780,24 @@ function updateCountdowns() {
     if (diff <= 0) {
       // Countdown expired!
       const readyHtml = '<span class="countdown-ready">READY ✓</span>';
+      
+      // Update visual only if needed
       if (el.innerHTML !== readyHtml) {
         el.innerHTML = readyHtml;
+      }
 
-        // Trigger notifikasi + auto-status toggle
-        const card = el.closest('.account-card');
-        const accountId = card?.dataset.accountId;
+      // DATA-DRIVEN AUTO-STATUS TOGGLE:
+      // We check the actual data state instead of just the DOM text.
+      const card = el.closest('.account-card');
+      const accountId = card?.dataset.accountId;
+      if (!accountId) return;
 
-        if (accountId && !notifiedIds.has(accountId)) {
+      const accounts = getAccounts();
+      const account = accounts.find((a) => a.id === accountId);
+
+      // Trigger if account is still limited and we haven't handled it in this session
+      if (account && account.status === 'limited') {
+        if (!notifiedIds.has(accountId)) {
           notifiedIds.add(accountId);
           const nameEl = card.querySelector('.card-name');
           const accountName = nameEl?.textContent?.trim() || 'Unknown';
@@ -797,29 +810,23 @@ function updateCountdowns() {
           addLog('TIMER_EXPIRED', `"${accountName}" → READY`);
           playAlert();
 
-          // AUTO-STATUS TOGGLE:
-          // Jika akun masih "limited", otomatis ubah ke "available"
-          const accounts = getAccounts();
-          const account = accounts.find((a) => a.id === accountId);
-          if (account && account.status === 'limited') {
-            // Jalankan update secara asinkron tanpa nge-block render frame UI
-            (async () => {
-              try {
-                await editAccount(accountId, { status: 'available' });
-                addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
-                
-                // Visual celebration: green flash on the card
-                if (card) {
-                  card.classList.add('auto-refresh-flash');
-                  card.addEventListener('animationend', () => {
-                    card.classList.remove('auto-refresh-flash');
-                  }, { once: true });
-                }
-              } catch (err) {
-                console.error("Auto-status update failed:", err);
+          // Jalankan update secara asinkron tanpa nge-block render frame UI
+          (async () => {
+            try {
+              await editAccount(accountId, { status: 'available' });
+              addLog('STATUS_CHANGED', `"${accountName}" limited → available (auto)`);
+              
+              // Visual celebration: green flash on the card
+              if (card) {
+                card.classList.add('auto-refresh-flash');
+                card.addEventListener('animationend', () => {
+                  card.classList.remove('auto-refresh-flash');
+                }, { once: true });
               }
-            })();
-          }
+            } catch (err) {
+              console.error("Auto-status update failed:", err);
+            }
+          })();
         }
       }
       return;
