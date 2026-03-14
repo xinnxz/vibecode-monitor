@@ -120,15 +120,26 @@ somniascan/
 
 ### 1. WhaleDetector.sol (Reactivity Core)
 ```solidity
-contract WhaleDetector is SomniaEventHandler {
-    uint256 public threshold = 10000 ether;
-    event WhaleAlert(address indexed from, address indexed to, uint256 amount, uint256 timestamp);
+// API sesuai @somnia-chain/reactivity-contracts v0.1.6
+contract WhaleDetector is SomniaEventHandler, Ownable {
+    uint256 public whaleThreshold = 100_000 ether;
+    event WhaleAlert(address indexed from, address indexed to, uint256 amount, uint256 alertId, uint256 timestamp);
 
-    // Auto-triggered by Somnia when Transfer events > threshold
-    function _onEvent(bytes memory eventData) internal override {
-        (address from, address to, uint256 amount) = decode(eventData);
-        if (amount >= threshold) {
-            emit WhaleAlert(from, to, amount, block.timestamp);
+    // Auto-triggered by Somnia Reactivity — 3 params sesuai v0.1.6
+    // eventTopics[0] = event sig hash
+    // eventTopics[1] = from address (indexed, padded 32 bytes)
+    // eventTopics[2] = to address (indexed, padded 32 bytes)
+    // data           = abi.encode(uint256 amount)
+    function _onEvent(
+        address emitter,
+        bytes32[] calldata eventTopics,
+        bytes calldata data
+    ) internal override {
+        address from = address(uint160(uint256(eventTopics[1])));
+        address to   = address(uint160(uint256(eventTopics[2])));
+        uint256 amount = abi.decode(data, (uint256));
+        if (amount >= whaleThreshold) {
+            emit WhaleAlert(from, to, amount, ++totalWhaleAlerts, block.timestamp);
         }
     }
 }
@@ -174,7 +185,7 @@ User profiles, subscription tiers, dan watchlist management on-chain.
 ### Smart Contracts
 | Tech | Purpose |
 |------|---------|
-| **Solidity ^0.8.x** | Smart contract language |
+| **Solidity 0.8.30** | Smart contract language (exact version, sesuai Somnia SDK) |
 | **Hardhat** | Development framework |
 | **@somnia-chain/reactivity-contracts** | Reactivity base contracts |
 | **@somnia-chain/streams** | Real-time data stream SDK |
@@ -264,3 +275,75 @@ User profiles, subscription tiers, dan watchlist management on-chain.
 - Alert builder test: buat rule → trigger kondisinya → verify alert fire
 - Globe animation FPS test: pastikan ≥30 FPS dengan 50+ animasi/detik
 - Cross-browser: Chrome, Firefox, Edge
+
+---
+
+## 🚀 Bonus Features (Fase Lanjutan)
+
+Fitur-fitur ini ditambahkan setelah fase inti selesai. Semua fitur di sini murni berbasis teknologi Web3/Blockchain dan tidak memerlukan backend terpusat apapun.
+
+---
+
+### Tier 1 — Reactivity-Powered Features
+
+#### Bonus 1: On-Chain Cron Scheduler
+- **Konsep:** User membuat "jadwal" di Smart Contract — misal: *"Kirim 10 STT ke alamat X setiap Senin jam 08.00"*.
+- **Reactivity:** Somnia Reactivity yang mengeksekusinya secara otomatis on-chain. Tidak perlu backend, tidak perlu cron job server.
+- **Globe:** Jadwal yang aktif ditampilkan sebagai titik berkedip dengan *countdown timer* di globe.
+- **Smart Contract Tasks:** Buat `CronScheduler.sol` extends `SomniaEventHandler`. `_onEvent()` berjalan saat waktu tercapai.
+
+#### Bonus 2: Reactive Leaderboard
+- **Konsep:** Dompet dengan transaksi terbanyak hari ini otomatis naik ranking secara on-chain.
+- **Reactivity:** Setiap tx baru → `_onEvent()` → cek apakah sender menembus threshold tertentu → update ranking.
+- **Globe:** Top 10 wallet divisualisasikan sebagai bintang/pilar paling besar dan terang di globe.
+- **Smart Contract Tasks:** Tambahkan mapping `leaderboard` ke `EventAggregator.sol`.
+
+#### Bonus 3: Smart Contract Health Monitor
+- **Konsep:** Subscribe ke contract tertentu. Jika contract mengalami spike transaksi gagal (revert), Reactivity emit `ContractAnomaly` alert.
+- **Reactivity:** Monitor event `ContractAnomaly` → frontend bereaksi menampilkan warning card.
+- **Globe:** Contract yang anomali ditandai dengan cahaya kuning berkelip di posisi node-nya.
+- **Smart Contract Tasks:** Tambahkan fungsi health check ke `AlertEngine.sol`.
+
+---
+
+### Tier 2 — On-Chain Intelligence Features
+
+#### Bonus 4: Token Flow Sankey Diagram
+- **Konsep:** Visualisasi interaktif: Dompet A kirim ke B, B kirim ke C dan D. Ditampilkan sebagai diagram aliran dana yang mengalir di antara node.
+- **Data:** Dibaca langsung dari event log transaksi Somnia RPC.
+- **Frontend:** Halaman baru `/flow` menggunakan library D3.js atau `react-flow`. Setiap node diklik menampilkan detail dompet.
+
+#### Bonus 5: MEV Detector
+- **Konsep:** Deteksi pola transaksi MEV (Maximal Extractable Value) — front-running, sandwich attack.
+- **Deteksi:** Analisis urutan transaksi dalam satu blok: jika ada transaksi A-B-A dengan selisih harga, tandai sebagai MEV.
+- **Globe:** Transaksi MEV yang terdeteksi ditandai warna **oranye** dengan ikon peringatan khusus.
+
+#### Bonus 6: Network Congestion Heatmap
+- **Konsep:** Globe divisualisasikan dengan warna berdasarkan "kepadatan" transaksi per region.
+- **Warna:** Merah = heavy congestion, kuning = sedang, hijau = lancar.
+- **Data:** Dihitung dari total tx per menit, dibagi berdasarkan distribusi node pseudo-location dari hash.
+
+#### Bonus 7: Dead Wallet Tracker
+- **Konsep:** Deteksi dompet yang menerima token tapi tidak pernah mengirim selama >90 hari. Berguna untuk analisis liquidity lock dan supply yang "frozen".
+- **Data:** Query dari riwayat transaksi on-chain.
+- **Globe:** Titik "mati" (Dead Wallets) berwarna abu-abu dengan efek visual seperti mati.
+
+---
+
+### Tier 3 — Gamifikasi & Sosial On-Chain
+
+#### Bonus 8: Wallet Fingerprinting / Persona
+- **Konsep:** Analisis pola transaksi dompet secara otomatis. Apakah ini DeFi Trader, NFT Collector, HODLer, atau Whale?
+- **Algoritma:** Hitung rasio: tx ke DEX / tx ke NFT Marketplace / tx send-only / frekuensi transaksi.
+- **Output:** Badge/label ditampilkan di profil dompet. Bisa disimpan sebagai on-chain metadata via `ScopeRegistry.sol`.
+
+#### Bonus 9: On-Chain Prediction Market (Mini)
+- **Konsep:** User bertaruh: *"Block berapa TX selanjutnya akan melampaui 500 gas?"* Hasil diverifikasi dan hadiah dibayar otomatis via Smart Contract.
+- **Reactivity:** Saat kondisi terpenuhi di blok tertentu, `_onEvent()` otomatis menghitung pemenang dan mentransfer hadiah STT.
+- **Smart Contract Tasks:** Buat `PredictionMarket.sol` baru.
+
+#### Bonus 10: Soulbound Token (SBT) — Proof of Activity
+- **Konsep:** Setiap pengguna yang connect wallet dan menggunakan SomniaScan (misal: memantau >100 blok atau men-trigger alert pertamanya), otomatis mendapat Soulbound Token (NFT yang tidak bisa dipindahtangankan) sebagai *"SomniaScan Early Adopter"*.
+- **Reactivity:** `_onEvent()` dari `ScopeRegistry.sol` memantau aktivitas user. Saat milestone tercapai, auto-mint SBT ke wallet user.
+- **Dampak:** Fitur ini secara organik mendorong orang untuk terus membuka SomniaScan, mendongkrak traffic di Somnia Testnet.
+- **Smart Contract Tasks:** Buat `SomniaScanSBT.sol` (ERC-721, non-transferable).
