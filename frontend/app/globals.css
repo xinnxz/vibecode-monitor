@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
+/* ============================================================
+   SomniaScan — Global Design System
+   Cyberpunk / Mission Control aesthetic
+   Dark base + neon purple/cyan/emerald accents
+   ============================================================ */
+
+/* ——— CSS Custom Properties (Design Tokens) ——— */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Color palette */
+  --color-bg:          #020408;
+  --color-bg-surface:  #080d14;
+  --color-bg-panel:    rgba(8, 13, 20, 0.85);
+  --color-border:      rgba(255, 255, 255, 0.07);
+
+  /* Neon accents */
+  --color-purple:      #a855f7;
+  --color-purple-dim:  rgba(168, 85, 247, 0.15);
+  --color-cyan:        #22d3ee;
+  --color-cyan-dim:    rgba(34, 211, 238, 0.12);
+  --color-emerald:     #10b981;
+  --color-emerald-dim: rgba(16, 185, 129, 0.12);
+  --color-red:         #ef4444;
+  --color-red-dim:     rgba(239, 68, 68, 0.15);
+  --color-yellow:      #eab308;
+
+  /* Typography */
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono:    var(--font-space-mono), 'Courier New', monospace;
+
+  /* Globe */
+  --globe-radius: 1.0;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ——— Base Reset ——— */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-bg);
+  color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: rgba(255, 255, 255, 0.87);
+  font-family: var(--font-display);
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Subtle scanline texture untuk efek monitor retro */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 200, 0.008) 2px,
+      rgba(0, 255, 200, 0.008) 4px
+    );
 }
+
+/* ——— Scrollbar Custom ——— */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.6); }
+
+/* ——— Typography ——— */
+.font-mono { font-family: var(--font-mono) !important; }
+
+/* ——— Glassmorphism panels ——— */
+.glass {
+  background: var(--color-bg-panel);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid var(--color-border);
+}
+
+.glass-purple {
+  background: rgba(168, 85, 247, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.glass-cyan {
+  background: rgba(34, 211, 238, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+/* ——— Neon text glow ——— */
+.neon-purple { color: var(--color-purple); text-shadow: 0 0 12px rgba(168, 85, 247, 0.8); }
+.neon-cyan   { color: var(--color-cyan);   text-shadow: 0 0 12px rgba(34, 211, 238, 0.8); }
+.neon-emerald{ color: var(--color-emerald);text-shadow: 0 0 12px rgba(16, 185, 129, 0.8); }
+.neon-red    { color: var(--color-red);    text-shadow: 0 0 12px rgba(239, 68, 68, 0.9); }
+
+/* ——— Neon border glow ——— */
+.border-glow-purple { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.15); }
+.border-glow-cyan   { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4),  0 0 16px rgba(34, 211, 238, 0.15); }
+.border-glow-red    { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),   0 0 20px rgba(239, 68, 68, 0.25); }
+
+/* ——— Animated pulse ring (dipakai di node ping globe) ——— */
+@keyframes ring-pulse {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.ring-pulse { animation: ring-pulse 1.5s ease-out infinite; }
+
+/* ——— Red wave (whale alert) ——— */
+@keyframes whale-wave {
+  0%   { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(4);   opacity: 0; }
+}
+.whale-wave { animation: whale-wave 1.2s ease-out forwards; }
+
+/* ——— Ticker scroll bottom bar ——— */
+@keyframes ticker-scroll {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-100%); }
+}
+.ticker-scroll { animation: ticker-scroll 30s linear infinite; white-space: nowrap; }
+
+/* ——— HUD number flip (nilai berubah) ——— */
+@keyframes hud-flip {
+  0%  { opacity: 0; transform: translateY(-8px); }
+  100%{ opacity: 1; transform: translateY(0); }
+}
+.hud-flip { animation: hud-flip 0.25s ease-out; }
+
+/* ——— Loading shimmer ——— */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* ——— Vignette overlay (pojok gelap seperti monitor) ——— */
+.vignette {
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
+  pointer-events: none;
+}
+
+/* ——— Terminal cursor blink ——— */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.cursor-blink { animation: blink 1s step-end infinite; }
