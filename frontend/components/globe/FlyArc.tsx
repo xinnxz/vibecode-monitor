@@ -96,14 +96,20 @@ export function FlyArc({
   });
 
   return (
-    <line ref={meshRef as unknown as React.Ref<THREE.Line>}>
-      <bufferGeometry attach="geometry" {...geometry} />
-      <lineBasicMaterial
-        color={color}
-        transparent
-        opacity={0.85}
-        linewidth={1}
+    <group>
+      <primitive
+        object={
+          (() => {
+            const pts = curve.getPoints(10);
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
+            const lineObj = new THREE.Line(geo, mat);
+            // Store refs for animation access
+            meshRef.current = lineObj as unknown as THREE.Mesh;
+            return lineObj;
+          })()
+        }
       />
-    </line>
+    </group>
   );
 }
