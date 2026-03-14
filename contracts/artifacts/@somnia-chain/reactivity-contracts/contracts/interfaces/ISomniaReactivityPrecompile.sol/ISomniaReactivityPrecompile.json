@@ -1,0 +1,308 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ISomniaReactivityPrecompile",
+  "sourceName": "@somnia-chain/reactivity-contracts/contracts/interfaces/ISomniaReactivityPrecompile.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint64",
+          "name": "blockNumber",
+          "type": "uint64"
+        }
+      ],
+      "name": "BlockTick",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "timestampMillis",
+          "type": "uint256"
+        }
+      ],
+      "name": "Schedule",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "subscriptionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "bytes32[4]",
+              "name": "eventTopics",
+              "type": "bytes32[4]"
+            },
+            {
+              "internalType": "address",
+              "name": "origin",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "caller",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "emitter",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "handlerContractAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "handlerFunctionSelector",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "priorityFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "maxFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "gasLimit",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bool",
+              "name": "isGuaranteed",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isCoalesced",
+              "type": "bool"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct ISomniaReactivityPrecompile.SubscriptionData",
+          "name": "subscriptionData",
+          "type": "tuple"
+        }
+      ],
+      "name": "SubscriptionCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "subscriptionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "SubscriptionRemoved",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "subscriptionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getSubscriptionInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32[4]",
+              "name": "eventTopics",
+              "type": "bytes32[4]"
+            },
+            {
+              "internalType": "address",
+              "name": "origin",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "caller",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "emitter",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "handlerContractAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "handlerFunctionSelector",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "priorityFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "maxFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "gasLimit",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bool",
+              "name": "isGuaranteed",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isCoalesced",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct ISomniaReactivityPrecompile.SubscriptionData",
+          "name": "subscriptionData",
+          "type": "tuple"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32[4]",
+              "name": "eventTopics",
+              "type": "bytes32[4]"
+            },
+            {
+              "internalType": "address",
+              "name": "origin",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "caller",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "emitter",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "handlerContractAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "handlerFunctionSelector",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "priorityFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "maxFeePerGas",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "gasLimit",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bool",
+              "name": "isGuaranteed",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "isCoalesced",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct ISomniaReactivityPrecompile.SubscriptionData",
+          "name": "subscriptionData",
+          "type": "tuple"
+        }
+      ],
+      "name": "subscribe",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "subscriptionId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "subscriptionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "unsubscribe",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
