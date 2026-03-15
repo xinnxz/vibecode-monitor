@@ -32,8 +32,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <Navbar />
 
-      {/* Main content scroll area */}
-      <main className="absolute inset-0 pt-14 pr-64 overflow-y-auto">
+      {/* Main content scroll area (adjusted for new floating UI sizing) */}
+      <main className="absolute inset-0 pt-28 pl-6 pr-[360px] pb-6 overflow-y-auto z-10">
         {children}
       </main>
 

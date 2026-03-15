@@ -9,20 +9,22 @@
 /* ——— CSS Custom Properties (Design Tokens) ——— */
 :root {
   /* Color palette */
-  --color-bg:          #020408;
-  --color-bg-surface:  #080d14;
-  --color-bg-panel:    rgba(8, 13, 20, 0.85);
-  --color-border:      rgba(255, 255, 255, 0.07);
+  --color-bg:          #010306;
+  --color-bg-surface:  rgba(2, 6, 12, 0.4);
+  --color-bg-panel:    rgba(6, 10, 18, 0.4);
+  --color-border:      rgba(255, 255, 255, 0.08);
+  --color-border-glow: rgba(255, 255, 255, 0.15);
 
   /* Neon accents */
-  --color-purple:      #a855f7;
-  --color-purple-dim:  rgba(168, 85, 247, 0.15);
+  --color-purple:      #c084fc;
+  --color-purple-dim:  rgba(192, 132, 252, 0.15);
   --color-cyan:        #22d3ee;
-  --color-cyan-dim:    rgba(34, 211, 238, 0.12);
-  --color-emerald:     #10b981;
-  --color-emerald-dim: rgba(16, 185, 129, 0.12);
-  --color-red:         #ef4444;
-  --color-red-dim:     rgba(239, 68, 68, 0.15);
+  --color-cyan-dim:    rgba(34, 211, 238, 0.15);
+  --color-emerald:     #34d399;
+  --color-emerald-dim: rgba(52, 211, 153, 0.15);
+  --color-red:         #fb7185;
+  --color-red-dim:     rgba(251, 113, 133, 0.15);
+  --color-yellow:      #facc15;
   --color-yellow:      #eab308;
 
   /* Typography */
@@ -75,28 +77,47 @@ body {
 /* ——— Glassmorphism panels ——— */
 .glass {
   background: var(--color-bg-panel);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
   border: 1px solid var(--color-border);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-pill {
+  background: rgba(2, 6, 12, 0.6);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
 }
 
 .glass-purple {
-  background: rgba(168, 85, 247, 0.06);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: rgba(192, 132, 252, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(192, 132, 252, 0.2);
+  box-shadow: 0 0 15px rgba(192, 132, 252, 0.1), inset 0 0 10px rgba(192, 132, 252, 0.05);
 }
 
 .glass-cyan {
-  background: rgba(34, 211, 238, 0.06);
-  backdrop-filter: blur(12px);
+  background: rgba(34, 211, 238, 0.05);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(34, 211, 238, 0.2);
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.1), inset 0 0 10px rgba(34, 211, 238, 0.05);
+}
+
+.glass-red {
+  background: rgba(251, 113, 133, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(251, 113, 133, 0.3);
+  box-shadow: 0 0 20px rgba(251, 113, 133, 0.15), inset 0 0 10px rgba(251, 113, 133, 0.05);
 }
 
 /* ——— Neon text glow ——— */
-.neon-purple { color: var(--color-purple); text-shadow: 0 0 12px rgba(168, 85, 247, 0.8); }
-.neon-cyan   { color: var(--color-cyan);   text-shadow: 0 0 12px rgba(34, 211, 238, 0.8); }
-.neon-emerald{ color: var(--color-emerald);text-shadow: 0 0 12px rgba(16, 185, 129, 0.8); }
-.neon-red    { color: var(--color-red);    text-shadow: 0 0 12px rgba(239, 68, 68, 0.9); }
+.neon-purple { color: var(--color-purple); text-shadow: 0 0 15px rgba(192, 132, 252, 0.8), 0 0 5px rgba(192, 132, 252, 0.5); }
+.neon-cyan   { color: var(--color-cyan);   text-shadow: 0 0 15px rgba(34, 211, 238, 0.8), 0 0 5px rgba(34, 211, 238, 0.5); }
+.neon-emerald{ color: var(--color-emerald);text-shadow: 0 0 15px rgba(52, 211, 153, 0.8), 0 0 5px rgba(52, 211, 153, 0.5); }
+.neon-red    { color: var(--color-red);    text-shadow: 0 0 15px rgba(251, 113, 133, 0.9), 0 0 5px rgba(251, 113, 133, 0.5); }
 
 /* ——— Neon border glow ——— */
 .border-glow-purple { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.15); }
