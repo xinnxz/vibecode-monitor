@@ -126,12 +126,16 @@ function SmartCycleSlot({
         if (selectedBlock) {
           // Track exactly how many txs are animating on screen right now!
           q.currentlyDisplaying.set(selectedBlock.number, selectedBlock.txCount);
+          
           setCurrentBlock(selectedBlock);
           setPhase("locking");
           setFlash(true);
-          
+
           // Add this block's TX strictly to the global visual accumulator
           globalAccumulator += selectedBlock.txCount;
+          
+          // PERFECT SYNC: Tell the Globe to render EXACTLY what the sidebar is rendering right now
+          useTpsStore.getState().pushGlobeBlock(selectedBlock);
 
           setTimeout(() => { if (mounted.current) setFlash(false); }, 500);
 

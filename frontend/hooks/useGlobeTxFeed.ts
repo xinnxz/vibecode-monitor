@@ -89,22 +89,24 @@ export function useGlobeTxFeed() {
   const [ripples, setRipples] = useState<ActiveRipple[]>([]);
   const [hubFlash, setHubFlash] = useState(false);
 
-  const latestBlock = useTpsStore(state => state.latestBlock);
+  const globeActiveBlocks = useTpsStore(state => state.globeActiveBlocks);
+  const shiftGlobeBlock = useTpsStore(state => state.shiftGlobeBlock);
   const tps = useTpsStore(state => state.chainTps);
   const { latestAlert } = useWhaleAlerts();
-  const lastBlockRef = useRef<number | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ——— STAGED ANIMATION QUEUE (The Pulse of the Network) ———
   useEffect(() => {
-    if (!latestBlock || latestBlock.number === lastBlockRef.current) return;
-    lastBlockRef.current = latestBlock.number;
+    if (globeActiveBlocks.length === 0) return;
+    
+    // Process the oldest unhandled block in the queue
+    const block = globeActiveBlocks[0];
 
     const ts = Date.now();
-    const txCount = latestBlock.txCount;
+    const txCount = block.txCount;
     const color = getArcColor(txCount);
     const intensity = getIntensity(txCount);
-    const txHashes = latestBlock.transactions;
+    const txHashes = block.transactions;
     const isBurst = txCount >= 50;
 
     // Phase 1 arrays (T = 0s)
@@ -138,13 +140,10 @@ export function useGlobeTxFeed() {
       });
     });
     
-    console.log(`[useGlobeTxFeed] Render Block #${latestBlock.number} | TX: ${txCount} | Arrays: Pings=${newPings.length}`);
+    console.log(`[useGlobeTxFeed] Render Block #${block.number} | TX: ${txCount} | Arrays: Pings=${newPings.length}`);
 
     // Immediately show pings
     setPings(prev => [...prev, ...newPings].slice(-100));
-
-    // Timer tracking for cleanup
-    const timers: ReturnType<typeof setTimeout>[] = [];
 
     // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=500ms ===
     if (!isBurst) {
@@ -157,7 +156,6 @@ export function useGlobeTxFeed() {
         }));
         setNodePulses(prev => [...prev, ...newGossip].slice(-50));
       }, 500);
-      timers.push(t1);
     }
 
     // === PHASE 3 & 4: VALIDATION ARC T=1000ms ===
@@ -205,7 +203,6 @@ export function useGlobeTxFeed() {
       const tRelay = setTimeout(() => {
         setArcs(prev => [...prev, ...relayArcs].slice(-300));
       }, 800);
-      timers.push(tRelay);
       
       if (isBurst || Math.random() < 0.3) {
         setHubFlash(true);
@@ -213,13 +210,10 @@ export function useGlobeTxFeed() {
         flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
       }
     }, 1000);
-    timers.push(t2);
 
-    // Cleanup function to clear all active timers if the block changes rapidly or component unmounts
-    return () => {
-      timers.forEach(clearTimeout);
-    };
-  }, [latestBlock]);
+    // Immediately shift the queue so the next block can be processed on the next render
+    shiftGlobeBlock();
+  }, [globeActiveBlocks, shiftGlobeBlock]);
 
   // ——— Whale Alert → outbound arc from hub (gold) ———
   useEffect(() => {

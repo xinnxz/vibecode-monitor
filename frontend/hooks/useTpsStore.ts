@@ -15,6 +15,11 @@ interface NetworkStore {
   setLatestBlock: (block: ProcessedBlock) => void;
   recentBlocks: ProcessedBlock[];
   setRecentBlocks: (blocks: ProcessedBlock[]) => void;
+
+  // Globe synchronization queue
+  globeActiveBlocks: ProcessedBlock[];
+  pushGlobeBlock: (block: ProcessedBlock) => void;
+  shiftGlobeBlock: () => void;
 }
 
 export const useTpsStore = create<NetworkStore>((set) => ({
@@ -27,4 +32,8 @@ export const useTpsStore = create<NetworkStore>((set) => ({
   setLatestBlock: (block) => set({ latestBlock: block }),
   recentBlocks: [],
   setRecentBlocks: (blocks) => set({ recentBlocks: blocks }),
+
+  globeActiveBlocks: [],
+  pushGlobeBlock: (block) => set((state) => ({ globeActiveBlocks: [...state.globeActiveBlocks, block] })),
+  shiftGlobeBlock: () => set((state) => ({ globeActiveBlocks: state.globeActiveBlocks.slice(1) })),
 }));

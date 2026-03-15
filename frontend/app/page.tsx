@@ -15,6 +15,7 @@ import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
 
 import { ReactNode } from "react";
+import { ProcessedBlock } from "@/hooks/useBlockStream";
 
 // ——— Premium HUD Stat Card (Corner Bracket Style with Standby Telemetry) ———
 function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
@@ -178,6 +179,23 @@ export default function DashboardPage() {
   const visualTps = useTpsStore((state) => state.visualTps);
   const recentBlocks = useTpsStore((state) => state.recentBlocks);
 
+  // --- DEBUG TOOL ---
+  const injectMockBlock = () => {
+    const mockBlock: ProcessedBlock = {
+      number: 999000000 + Math.floor(Math.random() * 1000), // Fake high block number
+      hash: "0x" + Math.random().toString(16).slice(2, 40) + "mock",
+      txCount: Math.floor(Math.random() * 150) + 15, // Generate 15-165 TXs
+      timestamp: Date.now(),
+      gasUsed: 0n,
+      transactions: Array.from({ length: 5 }, () => "0x" + Math.random().toString(16).slice(2, 40)),
+    };
+    
+    // Inject directly into the store so the Sidebar picks it up as a "new" block
+    const store = useTpsStore.getState();
+    store.setRecentBlocks([mockBlock, ...store.recentBlocks].slice(0, 15));
+  };
+  // ------------------
+
   return (
     <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
 
@@ -248,6 +266,14 @@ export default function DashboardPage() {
 
         {/* ——— Whale Ticker (Bottom Edge) ——— */}
         <WhaleTicker />
+
+        {/* DEBUG BUTTON */}
+        <button 
+          onClick={injectMockBlock}
+          className="absolute right-8 bottom-[520px] pointer-events-auto px-4 py-2 bg-purple-600/30 border border-purple-500/50 text-purple-200 text-xs font-mono rounded hover:bg-purple-500/50 transition-colors backdrop-blur-sm"
+        >
+          [DEBUG] Inject Mock Block
+        </button>
       </div>
 
     </div>
