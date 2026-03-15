@@ -175,9 +175,13 @@ function WhaleTicker() {
 export default function DashboardPage() {
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
-  // Read network state from global store
+  
+  // Read INSTANT network state from global store (Bypassing slow contracts for the demo)
   const visualTps = useTpsStore((state) => state.visualTps);
   const recentBlocks = useTpsStore((state) => state.recentBlocks);
+  const sessionTotalTx = useTpsStore((state) => state.sessionTotalTx);
+  const sessionWallets = useTpsStore((state) => state.sessionWallets);
+  const sessionWhales  = useTpsStore((state) => state.sessionWhales);
 
   // --- DEBUG TOOL ---
   const injectMockBlock = () => {
@@ -215,9 +219,9 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-          <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Block Hash</span>
+          <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Session TX</span>
           <span className="text-[11px] font-bold tracking-[0.2em] font-mono text-purple-400">
-            {stats.totalTransactions > 0 ? `#${(stats.totalTransactions * 123).toString().substring(0, 6)}` : "AWAITING"}
+            {sessionTotalTx > 0 ? `#${(sessionTotalTx * 123).toString().substring(0, 6)}` : "AWAITING"}
           </span>
         </div>
       </div>
@@ -232,8 +236,8 @@ export default function DashboardPage() {
         >
           <StatCard
             label="Total TX"
-            value={formatCompact(stats.totalTransactions)}
-            sub="All Time"
+            value={formatCompact(sessionTotalTx)}
+            sub="Current Session"
             colorClass="text-purple-400"
             borderColor="#a855f7"
           />
@@ -250,15 +254,15 @@ export default function DashboardPage() {
           />
           <StatCard
             label="Wallets"
-            value={formatCompact(stats.uniqueAddressCount)}
-            sub="Unique Tracking"
+            value={formatCompact(sessionWallets.size)}
+            sub="Unique Instances"
             colorClass="text-blue-400"
             borderColor="#3b82f6"
           />
           <StatCard
             label="Whales"
-            value={whaleAlerts.length}
-            sub="Detected Anomaly"
+            value={whaleAlerts.length + sessionWhales}
+            sub="Detected Activity"
             colorClass="text-red-400"
             borderColor="#ef4444"
           />

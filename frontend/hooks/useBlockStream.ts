@@ -19,6 +19,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ethers } from "ethers";
+import { useTpsStore } from "./useTpsStore";
 
 // Tipe data untuk satu blok yang sudah diolah
 export interface ProcessedBlock {
@@ -134,6 +135,18 @@ export function useBlockStream(): UseBlockStreamReturn {
               time: Date.now(),
               estimatedTx: processed.txCount,
             });
+            
+            // --- INSTANT UI AGGREGATORS (Bypass Slow Contract) ---
+            const store = useTpsStore.getState();
+            store.addSessionTx(processed.txCount);
+            
+            // Generate pseudo-wallets from tx hashes for the visual demo
+            if (processed.transactions.length > 0) {
+              const fakeWallets = processed.transactions.map(
+                hash => `0x${hash.slice(2, 42).padEnd(40, '0')}`
+              );
+              store.addSessionWallets(fakeWallets);
+            }
 
             if (mounted) {
               setLatestBlock(processed);

@@ -12,7 +12,13 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { WalletButton } from "@/components/ui/WalletButton";
+import dynamic from "next/dynamic";
+
+// DYNAMIC IMPORT: Bypasses SSR for wagmi hooks to prevent React hydration state mismatch warnings
+const WalletButton = dynamic(
+  () => import("@/components/ui/WalletButton").then(mod => mod.WalletButton), 
+  { ssr: false, loading: () => <div style={{ width: 160, height: 48, background: "rgba(255,255,255,0.05)", borderRadius: 4 }} /> }
+);
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
