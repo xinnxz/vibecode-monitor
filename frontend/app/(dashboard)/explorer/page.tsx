@@ -49,7 +49,7 @@ function BlockRow({ block, index }: { block: ReturnType<typeof useBlockStream>["
         {/* Gas */}
         <div className="flex-1 hidden sm:flex items-center gap-1.5">
           <span className="text-xs text-white/30 font-mono">gas</span>
-          <span className="text-white/60 font-mono text-xs">{formatCompact(block.gasUsed)}</span>
+          <span className="text-white/60 font-mono text-xs">{formatCompact(Number(block.gasUsed))}</span>
         </div>
 
         {/* Time */}
