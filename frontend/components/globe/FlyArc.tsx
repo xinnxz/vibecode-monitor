@@ -20,8 +20,6 @@ import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
 
 const R = 50;
-const ARC_SEGMENTS = 32; // Halved for massive performance gains, visual difference is invisible
-const COMET_POINTS = 50; // Halved for WebGL draw speed under high load
 const GHOST_DURATION = 0.5; // VERY SHORT ghost trail (was 15s) so it vanishes immediately
 
 interface FlyArcProps {
@@ -33,6 +31,7 @@ interface FlyArcProps {
   endColor?: string; // New: Enables beautiful sci-fi gradients
   speed?: number;
   intensity?: number;
+  isBurst?: boolean; // New: LOD trigger for massive blocks
   onDone?: () => void;
 }
 
@@ -129,8 +128,15 @@ export function FlyArc({
   endColor,
   speed = 0.4, // Increased default speed significantly
   intensity = 0.5,
+  isBurst = false,
   onDone,
 }: FlyArcProps) {
+  // DYNAMIC LEVEL OF DETAIL (LOD)
+  // Normal load: 32 segments, 50 particles
+  // Burst load (>50 TX): 12 segments, 10 particles. Looks like a solid laser beam, saves 80% geometry.
+  const arcSegments = isBurst ? 12 : 32;
+  const cometPoints = isBurst ? 10 : 50;
+
   const groupRef = useRef<THREE.Group>(null!);
   const progress = useRef(0);
   const ghostAge = useRef(0);
@@ -152,8 +158,8 @@ export function FlyArc({
 
   // Generate high-arc points using reference algorithm
   const arcPoints = useMemo(
-    () => generateArcPoints(fromLat, fromLng, toLat, toLng, ARC_SEGMENTS).points,
-    [fromLat, fromLng, toLat, toLng]
+    () => generateArcPoints(fromLat, fromLng, toLat, toLng, arcSegments).points,
+    [fromLat, fromLng, toLat, toLng, arcSegments]
   );
 
   // ——— Layer 1: Static path line ———
@@ -189,23 +195,25 @@ export function FlyArc({
 
   // ——— Layer 2: Comet particles ———
   const comet = useMemo(() => {
-    const positions = new Float32Array(COMET_POINTS * 3);
-    const percents = new Float32Array(COMET_POINTS);
-    const colors = new Float32Array(COMET_POINTS * 3);
+    const positions = new Float32Array(cometPoints * 3);
+    const percents = new Float32Array(cometPoints);
+    const colors = new Float32Array(cometPoints * 3);
 
     const colStart = new THREE.Color(color);
     const colEnd = new THREE.Color(endColor || color);
 
-    for (let i = 0; i < COMET_POINTS; i++) {
-      percents[i] = i / COMET_POINTS;
+    for (let i = 0; i < cometPoints; i++) {
+      percents[i] = i / cometPoints;
 
-      const factor = i / Math.max(1, COMET_POINTS - 1);
+      const factor = i / Math.max(1, cometPoints - 1);
       const c = colStart.clone().lerp(colEnd, factor);
 
       // Prevents 100% white blowout with additive blending.
       // Keeps the head bright, but the tail dims gracefully.
       // Reduced the scalar massively so that 100 overlapping points don't sum to pure white.
-      const alpha = (0.05 + 0.25 * factor) * (1.1 - intensity * 0.2);
+      // In burst mode, make them slightly brighter individually to compensate for fewer overlapping points
+      const alphaBoost = isBurst ? 1.5 : 1.0;
+      const alpha = (0.05 + 0.25 * factor) * (1.1 - intensity * 0.2) * alphaBoost;
       c.multiplyScalar(alpha);
 
       colors[i * 3] = c.r;
@@ -239,7 +247,7 @@ export function FlyArc({
 
     const points = new THREE.Points(geo, mat);
     return { points, geo, mat };
-  }, [color, intensity]);
+  }, [color, endColor, intensity, isBurst, cometPoints, circleTex]);
 
   useEffect(() => {
     if (groupRef.current && !addedRef.current) {
@@ -266,14 +274,14 @@ export function FlyArc({
       const eased = Math.pow(raw, 3);
 
       // Update comet positions (30% tail)
-      const headIdx = Math.floor(eased * ARC_SEGMENTS);
-      const tailIdx = Math.max(0, Math.floor((eased - 0.30) * ARC_SEGMENTS));
+      const headIdx = Math.floor(eased * arcSegments);
+      const tailIdx = Math.max(0, Math.floor((eased - 0.30) * arcSegments));
       const span = headIdx - tailIdx;
 
       const posAttr = comet.geo.getAttribute("position") as THREE.BufferAttribute;
-      for (let i = 0; i < COMET_POINTS; i++) {
-        const segIdx = tailIdx + Math.round((i / COMET_POINTS) * span);
-        const pt = arcPoints[Math.min(segIdx, ARC_SEGMENTS)];
+      for (let i = 0; i < cometPoints; i++) {
+        const segIdx = tailIdx + Math.round((i / cometPoints) * span);
+        const pt = arcPoints[Math.min(segIdx, arcSegments)];
         posAttr.setXYZ(i, pt.x, pt.y, pt.z);
       }
       posAttr.needsUpdate = true;

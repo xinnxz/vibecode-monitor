@@ -113,8 +113,10 @@ export function GlobeScene() {
                 toLat={a.toLat}
                 toLng={a.toLng}
                 color={a.color}
+                endColor={a.endColor}
                 speed={a.speed}
                 intensity={a.intensity}
+                isBurst={a.isBurst}
                 onDone={() => onArcLanded(a.id, isWhale, a.isHubBound)}
               />
             );

@@ -40,6 +40,7 @@ export interface ActiveArc {
   isWhale?: boolean;
   isHubBound?: boolean;
   isRelay?: boolean;
+  isBurst?: boolean;
 }
 export interface ActiveBurst {
   id: string; lat: number; lng: number; color: string;
@@ -112,9 +113,10 @@ export function useGlobeTxFeed() {
     // Phase 1 arrays (T = 0s)
     const newPings: ActivePing[] = [];
     
-    // VISUAL HONESTY: Render EXACTLY txCount arcs, not just the sliced hashes length
-    // If txCount is huge, cap at 300 to prevent browser crash, but it will be a massively dense visual burst.
-    const renderCount = Math.min(txCount, 300);
+    // VISUAL HONESTY vs GPU SURVIVAL:
+    // We visually represent a massive block by firing 150 "Fat Arcs" (Low-poly, high intensity)
+    // rather than trying to render 500 individual paths which crashes Chrome.
+    const renderCount = Math.min(txCount, 150);
 
     // Arrays for Phase 2 & 3 closures
     const hashesData = Array.from({ length: renderCount }).map((_, i) => {
@@ -168,24 +170,29 @@ export function useGlobeTxFeed() {
           color, // Terminal feed color
           endColor: "#818cf8", // Beautiful sci-fi Indigo gradient explicitly for the Regional Node
           speed: arcSpeed,
-          intensity,
+          intensity: isBurst ? intensity * 1.5 : intensity, // Boost glow when firing fewer "fat" arcs
           isHubBound: false,
+          isBurst, // Pass LOD flag
         });
 
         // Regional Validator Node -> Somnia Hub Singapore (Relay Hop)
-        relayArcs.push({
-          id: `relay-${data.id}`,
-          fromLat: data.nearestNode.lat,
-          fromLng: data.nearestNode.lng,
-          toLat: HUB_LAT,
-          toLng: HUB_LNG,
-          color: "#ec4899", // Neon Pink distinct start color
-          endColor: "#f59e0b", // Gold/Orange Hub distinct end color
-          speed: arcSpeed * 2.5, // Resync travels much faster on the backbone
-          intensity: intensity * 0.5,
-          isHubBound: true,
-          isRelay: true,
-        });
+        // If it's a massive burst, only relay 20% of them to the hub visually so we don't double the geometry count
+        if (!isBurst || Math.random() < 0.2) {
+          relayArcs.push({
+            id: `relay-${data.id}`,
+            fromLat: data.nearestNode.lat,
+            fromLng: data.nearestNode.lng,
+            toLat: HUB_LAT,
+            toLng: HUB_LNG,
+            color: "#ec4899", // Neon Pink distinct start color
+            endColor: "#f59e0b", // Gold/Orange Hub distinct end color
+            speed: arcSpeed * 2.5, // Resync travels much faster on the backbone
+            intensity: intensity * 0.5,
+            isHubBound: true,
+            isRelay: true,
+            isBurst, // Pass LOD flag
+          });
+        }
       });
 
       // Show Origin -> Validator immediately (T=150ms)
