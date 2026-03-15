@@ -171,8 +171,8 @@ export function EarthGlobe() {
       const zF = r * Math.sin(nu);
       pts.push(new THREE.Vector3(xF, zF * Math.sin(ORBIT_I), zF * Math.cos(ORBIT_I)));
     }
-    const curve = new THREE.CatmullRomCurve3(pts, true);
-    return new THREE.TubeGeometry(curve, 200, 0.12);
+    const geometry = new THREE.BufferGeometry().setFromPoints(pts);
+    return geometry;
   }, []);
 
   // ——— Animation Loop ———
@@ -196,7 +196,7 @@ export function EarthGlobe() {
     <group ref={earthRef}>
       {/* ——— 1. Point border ——— */}
       <points>
-        <sphereGeometry args={[R + 10, 60, 60]} />
+        <sphereGeometry args={[R + 10, 32, 32]} />
         <pointsMaterial
           color={0x2e0094}
           transparent
@@ -208,13 +208,13 @@ export function EarthGlobe() {
 
       {/* ——— 2. Earth sphere ——— */}
       <mesh>
-        <sphereGeometry args={[R, 50, 50]} />
+        <sphereGeometry args={[R, 32, 32]} />
         <shaderMaterial uniforms={uniforms} vertexShader={vertexShader} fragmentShader={fragmentShader} />
       </mesh>
 
       {/* ——— 3. Atmosphere Fresnel glow ——— */}
       <mesh>
-        <sphereGeometry args={[R, 50, 50]} />
+        <sphereGeometry args={[R, 32, 32]} />
         <shaderMaterial
           uniforms={{
             coeficient: { value: 1.0 },
@@ -235,9 +235,9 @@ export function EarthGlobe() {
       </sprite>
 
       {/* ——— 5. Lunar orbit trail (Keplerian ellipse with 5.145° tilt) ——— */}
-      <mesh geometry={orbitTrailGeo}>
-        <meshBasicMaterial color={0x4b0082} transparent opacity={0.2} side={THREE.DoubleSide} />
-      </mesh>
+      <line geometry={orbitTrailGeo}>
+        <lineBasicMaterial color={0x4b0082} transparent opacity={0.2} />
+      </line>
 
       {/* ——— 6. Moon (travels along Keplerian orbit) ——— */}
       <mesh ref={moonRef}>

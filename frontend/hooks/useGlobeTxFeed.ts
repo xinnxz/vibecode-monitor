@@ -114,9 +114,9 @@ export function useGlobeTxFeed() {
     const newPings: ActivePing[] = [];
     
     // VISUAL HONESTY vs GPU SURVIVAL:
-    // We visually represent a massive block by firing 150 "Fat Arcs" (Low-poly, high intensity)
-    // rather than trying to render 500 individual paths which crashes Chrome.
-    const renderCount = Math.min(txCount, 150);
+    // We visually represent a massive block by firing max 20 "Fat Arcs" (Low-poly, high intensity)
+    // rather than trying to render 150-500 individual paths which crashes Chrome's garbage collector.
+    const renderCount = Math.min(txCount, 20);
 
     // Arrays for Phase 2 & 3 closures
     const hashesData = Array.from({ length: renderCount }).map((_, i) => {

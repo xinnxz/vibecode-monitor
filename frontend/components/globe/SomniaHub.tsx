@@ -14,7 +14,7 @@ import { latLngToXYZ } from "@/lib/utils/geo";
 import { NodeLabel } from "./NodeLabel";
 
 // Singapore — geographic anchor
-export const HUB_LAT =   1.3521;
+export const HUB_LAT = 1.3521;
 export const HUB_LNG = 103.8198;
 
 interface SomniaHubProps {
@@ -25,13 +25,13 @@ interface SomniaHubProps {
 const R = 50;
 
 export function SomniaHub({ tps = 0, flash = false }: SomniaHubProps) {
-  const groupRef  = useRef<THREE.Group>(null!);
-  const coreRef   = useRef<THREE.Mesh>(null!);
-  const haloRef   = useRef<THREE.Mesh>(null!);
-  const ring1Ref  = useRef<THREE.Mesh>(null!);
-  const ring2Ref  = useRef<THREE.Mesh>(null!);
-  const flashRef  = useRef(0);
-  const timeRef   = useRef(0);
+  const groupRef = useRef<THREE.Group>(null!);
+  const coreRef = useRef<THREE.Mesh>(null!);
+  const haloRef = useRef<THREE.Mesh>(null!);
+  const ring1Ref = useRef<THREE.Mesh>(null!);
+  const ring2Ref = useRef<THREE.Mesh>(null!);
+  const flashRef = useRef(0);
+  const timeRef = useRef(0);
 
   // Base position on non-rotating unit sphere — rotation applied via group
   const basePos = useMemo(() => {
@@ -133,7 +133,7 @@ export function SomniaHub({ tps = 0, flash = false }: SomniaHubProps) {
         </mesh>
 
         {/* Cyberpunk HUD Label — SOMNIA HQ */}
-        <NodeLabel name="SOMNIA HQ" region="CORE-NEXUS" color="#a855f7" isHub offsetY={6} />
+        <NodeLabel name="SOMNIA HQ" region="CORE-NEXUS" color="#a855f7" isHub offsetY={6} nodePos={basePos} />
       </group>
     </group>
   );

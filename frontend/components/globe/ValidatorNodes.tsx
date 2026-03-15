@@ -113,7 +113,7 @@ export function ValidatorNodes() {
               <meshBasicMaterial color={v.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
             {/* Cyberpunk HUD Label */}
-            <NodeLabel name={v.name} region={v.region} color={v.hex} />
+            <NodeLabel name={v.name} region={v.region} color={v.hex} nodePos={pos} />
           </group>
         );
       })}

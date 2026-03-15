@@ -132,10 +132,11 @@ export function FlyArc({
   onDone,
 }: FlyArcProps) {
   // DYNAMIC LEVEL OF DETAIL (LOD)
-  // Normal load: 32 segments, 50 particles
-  // Burst load (>50 TX): 12 segments, 10 particles. Looks like a solid laser beam, saves 80% geometry.
-  const arcSegments = isBurst ? 12 : 32;
-  const cometPoints = isBurst ? 10 : 50;
+  // Heavily optimized LOD settings to save CPU array updates in useFrame
+  // Normal load: 24 segments, 25 particles
+  // Burst load (>50 TX): 10 segments, 8 particles. Looks like a solid laser beam, saves 80% geometry.
+  const arcSegments = isBurst ? 10 : 24;
+  const cometPoints = isBurst ? 8  : 25;
 
   const groupRef = useRef<THREE.Group>(null!);
   const progress = useRef(0);
@@ -227,7 +228,8 @@ export function FlyArc({
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 1.2 + intensity * 0.4, // Massively reduced from 2.8+ to prevent fat white arrows
+      // Increased size purely to compensate for fewer points, ensuring the tail still looks like an unbroken stream
+      size: 1.8 + intensity * 0.5, 
       transparent: true,
       opacity: 0.85,
       depthWrite: false,

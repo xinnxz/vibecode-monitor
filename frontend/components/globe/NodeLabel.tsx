@@ -2,26 +2,29 @@
 // components/globe/NodeLabel.tsx
 // ============================================================
 // Cyberpunk-style floating HUD label for globe nodes.
-// Inspired by the Neo-Kyoto District label style from the
-// reference image: bent elbow connector line, glassmorphism
-// background, neon glow border matching node color.
-//
-// Key props:
-// - occlude: hides the label when behind the globe (no z-fighting)
-// - distanceFactor: auto-scales with camera distance
+// Highly optimized for WebGL performance.
+// - No heavy CSS filters (backdrop-filter)
+// - No Three.js <Html occlude> raycasting (which kills FPS)
+// - Uses pure JS useFrame math to calculate scale and opacity
+//   based on the camera's angle and distance.
 // ============================================================
 
 import { Html } from "@react-three/drei";
-import { useMemo } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import * as THREE from "three";
 
 interface NodeLabelProps {
   name: string;
   region: string;
-  color: string;       // CSS hex color e.g. "#3b82f6"
-  isHub?: boolean;     // Larger premium label for Somnia HQ
-  offsetY?: number;    // Vertical offset above node centre
-  side?: "left" | "right"; // Which side the label floats to
+  color: string;
+  isHub?: boolean;
+  offsetY?: number;
+  side?: "left" | "right";
+  nodePos: THREE.Vector3; // Position of the node on the globe surface
 }
+
+const GLOBE_CENTER = new THREE.Vector3(0, 0, 0);
 
 export function NodeLabel({
   name,
@@ -30,158 +33,214 @@ export function NodeLabel({
   isHub = false,
   offsetY = 6,
   side = "right",
+  nodePos,
 }: NodeLabelProps) {
+  const containerRef = useRef<HTMLDivElement>(null!);
+  const { camera } = useThree();
 
-  const wrapStyle = useMemo<React.CSSProperties>(() => ({
-    position: "relative",
-    pointerEvents: "none",
-    userSelect: "none",
-    // If label is on the left, flip the whole connector+card layout
-    display: "flex",
-    flexDirection: side === "right" ? "row" : "row-reverse",
-    alignItems: "flex-end",
-    gap: "0px",
-  }), [side]);
+  // We manually calculate occlusion (hiding behind the globe) and scale
+  // because <Html occlude distanceFactor> causes massive FPS drops natively.
+  useFrame(() => {
+    if (!containerRef.current) return;
 
-  // Card sizes
-  const cardW  = isHub ? 148 : 118;
-  const fontSize = isHub ? 10 : 8.5;
-  const subSize  = isHub ? 8  : 7;
+    // 1. Calculate Occlusion (is the node behind the earth from camera view?)
+    // Using exact spherical horizon distance math to prevent fading out when zoomed in closely
+    const R = 50; // Earth globe radius
+    const camDistToCenter = camera.position.length();
+    const horizonDist = Math.sqrt(Math.max(0, camDistToCenter * camDistToCenter - R * R));
+    const distToNode = camera.position.distanceTo(nodePos);
+
+    // Smooth fade around the horizon edge
+    const visibilityMargin = 2.0;
+    let targetOpacity = 0;
+    if (distToNode < horizonDist - visibilityMargin) {
+      targetOpacity = 1; // Fully visible on the front face
+    } else if (distToNode < horizonDist + visibilityMargin) {
+      // Fade out smoothly over the margin
+      targetOpacity = 1 - (distToNode - (horizonDist - visibilityMargin)) / (visibilityMargin * 2);
+    }
+
+    // 2. Calculate Distance Scale
+    // How far is the camera?
+    const dist = camera.position.distanceTo(nodePos);
+    
+    // As `dist` gets larger (zoomed out), we want `targetScale` to get smaller.
+    // Base scale is smaller now so they don't dominate the screen.
+    const baseScale = isHub ? 0.65 : 0.5;
+    
+    // 120 is an arbitrary tuning distance where scale = baseScale.
+    // If distance > 120 (zoomed out), scale < baseScale.
+    // If distance < 120 (zoomed in), scale > baseScale.
+    // clamp between 0.2 (min size) and 1.2 (max size so it doesn't get huge).
+    const scaleFactor = 120 / dist;
+    const targetScale = Math.max(0.2, Math.min(1.2, scaleFactor * baseScale));
+
+    // Apply via direct CSS transform (no React state re-renders = fast)
+    containerRef.current.style.opacity = targetOpacity.toFixed(2);
+    containerRef.current.style.pointerEvents = targetOpacity < 0.1 ? "none" : "auto";
+    // Scale from the exact 0,0 anchor point
+    containerRef.current.style.transform = `scale(${targetScale.toFixed(3)}) translate3d(0,0,0)`;
+  });
+
+  const cardW  = isHub ? 200 : 160;
+  const fontSize = isHub ? 20 : 18;
+  const subSize  = isHub ? 10 : 9;
+  const dotRadius = isHub ? 3.5 : 2.5;
+
+  // SVG Line dimensions
+  const dx = isHub ? 40 : 25; // Diagonal X distance
+  const dy = isHub ? 40 : 25; // Diagonal Y distance (upwards)
+  const cx = isHub ? 40 : 30; // Horizontal line extension
+  
+  const sign = side === "right" ? 1 : -1;
+  const endX = (dx + cx) * sign;
+  const endY = -dy;
+
+  // Build the SVG path (M = Move to, L = Line to)
+  const pathD = `M 0 0 L ${dx * sign} ${-dy} L ${endX} ${endY}`;
+
+  // Find the exact bounding box for the SVG so it doesn't get clipped
+  const svgWidth = dx + cx + 4; // Add padding for stroke
+  const svgHeight = dy + 4;
 
   return (
     <Html
-      position={[0, offsetY, 0]}
-      // Billboard — always face camera
+      // Position exactly at the center of the node sphere!
+      position={[0, 0, 0]}
       center={false}
-      // occlude hides label when obscured by the globe mesh
-      occlude
       style={{ overflow: "visible" }}
       zIndexRange={[100, 0]}
     >
-      <div style={wrapStyle}>
-        {/* ——— Elbow Connector (L-shape) ——— */}
+      {/* Container scaled dynamically by useFrame.
+          Origin is 0,0 (the literal node center), so scaling never shifts the anchor point. */}
+      <div 
+        ref={containerRef} 
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          transformOrigin: "0 0",
+          opacity: 0,
+          willChange: "transform, opacity",
+          pointerEvents: "none",
+          userSelect: "none"
+        }}
+      >
+        
+        {/* ——— SVG Connector Line ——— */}
+        {/* We absolutely position the SVG so its 0,0 aligns with the parent 0,0 */}
+        <svg 
+          style={{ 
+            position: "absolute", 
+            top: -dy - 2, 
+            left: side === "right" ? -2 : -svgWidth + 2, 
+            width: svgWidth, 
+            height: svgHeight,
+            overflow: "visible",
+            pointerEvents: "none"
+          }}
+        >
+          {/* Faked Glow (fat semi-transparent stroke) avoids WebGL drop-shadow lag */}
+          <path 
+            d={`M ${side === "right" ? 0 : svgWidth} ${dy} L ${side === "right" ? dx : svgWidth - dx} 0 L ${side === "right" ? dx + cx : svgWidth - dx - cx} 0`} 
+            fill="none" 
+            stroke={color} 
+            strokeWidth="4"
+            opacity={0.3}
+          />
+          {/* Main solid line */}
+          <path 
+            d={`M ${side === "right" ? 0 : svgWidth} ${dy} L ${side === "right" ? dx : svgWidth - dx} 0 L ${side === "right" ? dx + cx : svgWidth - dx - cx} 0`} 
+            fill="none" 
+            stroke={color} 
+            strokeWidth="1.5"
+          />
+        </svg>
+
+        {/* ——— Anchor Dot (Exactly at 0,0) ——— */}
         <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: side === "right" ? "flex-end" : "flex-start",
-          gap: 0,
-        }}>
-          {/* Vertical segment (drops from label bottom down to node level) */}
-          <div style={{
-            width: "1px",
-            height: isHub ? "28px" : "22px",
-            background: `linear-gradient(to bottom, ${color}cc, ${color}40)`,
-            marginLeft: side === "right" ? "auto" : "0",
-            marginRight: side === "right" ? "0" : "auto",
-          }} />
-          {/* Horizontal segment (runs sideways along the bottom) */}
-          <div style={{
-            height: "1px",
-            width: isHub ? "28px" : "22px",
-            background: `linear-gradient(${side === "right" ? "to left" : "to right"}, ${color}cc, ${color}40)`,
-          }} />
-          {/* End dot (at the node) */}
-          <div style={{
-            width: "5px", height: "5px",
-            borderRadius: "50%",
-            background: color,
-            boxShadow: `0 0 6px ${color}, 0 0 12px ${color}60`,
-            transform: side === "right" ? "translateX(2px)" : "translateX(-2px)",
-          }} />
-        </div>
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${dotRadius * 2}px`, 
+          height: `${dotRadius * 2}px`,
+          borderRadius: "50%",
+          background: color,
+          boxShadow: `0 0 8px ${color}, 0 0 16px ${color}80`,
+          transform: "translate(-50%, -50%)", // perfectly center on the 3D coord
+        }} />
 
         {/* ——— Main HUD Card ——— */}
         <div style={{
+          position: "absolute",
+          // Anchor the card exactly at the end of the SVG line
+          top: `${endY}px`,
+          ...(side === "right" ? { left: `${endX}px` } : { right: `${-endX}px` }),
+          // Center vertically relative to the line end, and add a tiny gap horizontally
+          transform: `translate(${side === "right" ? "2px" : "-2px"}, -50%)`,
           width: `${cardW}px`,
-          background: "rgba(3, 8, 20, 0.85)", // Solidified to restore readability without backdrop-filter
-          border: `1px solid ${color}50`,
-          borderLeft: side === "right" ? `3px solid ${color}` : `1px solid ${color}50`,
-          borderRight: side === "left" ? `3px solid ${color}` : `1px solid ${color}50`,
-          padding: isHub ? "8px 12px" : "6px 10px",
-          position: "relative",
-          boxShadow: `0 0 8px ${color}18`, // Reduced shadow
-
-          // Offset card so connector meets the corner correctly
-          transform: `translateY(calc(-100% + ${isHub ? "0px" : "0px"}))`,
+          background: "rgba(2, 6, 14, 0.85)", // Slightly more transparent
+          border: `1px solid ${color}40`,
+          borderLeft: side === "right" ? `3px solid ${color}` : `1px solid ${color}40`,
+          borderRight: side === "left" ? `3px solid ${color}` : `1px solid ${color}40`,
+          padding: isHub ? "8px 12px" : "6px 10px", // Tighter padding
+          boxShadow: `0 0 10px ${color}15`,
         }}>
           {/* Corner accents */}
           <div style={{
-            position: "absolute", top: 0, left: 0,
-            width: "8px", height: "8px",
-            borderTop: `1.5px solid ${color}`,
-            borderLeft: `1.5px solid ${color}`,
+            position: "absolute", top: 0, left: 0, width: "10px", height: "10px",
+            borderTop: `2px solid ${color}`, borderLeft: `2px solid ${color}`,
           }} />
           <div style={{
-            position: "absolute", bottom: 0, right: 0,
-            width: "8px", height: "8px",
-            borderBottom: `1.5px solid ${color}`,
-            borderRight: `1.5px solid ${color}`,
+            position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px",
+            borderBottom: `2px solid ${color}`, borderRight: `2px solid ${color}`,
           }} />
 
-          {/* Icon + name row */}
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          {/* Title Row */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {isHub && (
               <div style={{
-                width: "14px", height: "14px",
-                border: `1px solid ${color}80`,
-                borderRadius: "2px",
+                width: "18px", height: "18px",
+                border: `1.5px solid ${color}80`, borderRadius: "3px",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "8px",
-                color: color,
-                flexShrink: 0,
+                fontSize: "12px", color: color,
               }}>⬡</div>
             )}
             <div style={{
               fontSize: `${fontSize}px`,
               fontWeight: 800,
               color: color,
-              letterSpacing: "0.18em",
+              letterSpacing: "0.2em",
               textTransform: "uppercase",
               fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
-              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+              lineHeight: 1.2,
             }}>
               {name}
             </div>
           </div>
 
-          {/* Divider */}
-          <div style={{
-            height: "1px",
-            background: `linear-gradient(to right, ${color}40, transparent)`,
-            margin: "4px 0",
-          }} />
+          <div style={{ height: "2px", background: `linear-gradient(to right, ${color}60, transparent)`, margin: "6px 0" }} />
 
-          {/* Region */}
           <div style={{
             fontSize: `${subSize}px`,
-            color: "rgba(255,255,255,0.50)",
-            letterSpacing: "0.12em",
+            color: "rgba(255,255,255,0.6)",
+            letterSpacing: "0.15em",
             textTransform: "uppercase",
             fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
-            lineHeight: 1.4,
+            whiteSpace: "nowrap",
           }}>
             {isHub ? "REGION: " : ""}{region}
           </div>
 
-          {/* Status */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "5px",
-            marginTop: "4px",
-          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px" }}>
             <div style={{
-              width: "5px", height: "5px",
-              borderRadius: "50%",
-              background: "#10b981",
-              boxShadow: "0 0 5px #10b981",
-              animation: "blink 2s ease-in-out infinite",
-              flexShrink: 0,
+              width: "6px", height: "6px", borderRadius: "50%",
+              background: "#10b981", boxShadow: "0 0 8px #10b981", animation: "blink 2s ease-in-out infinite",
             }} />
             <span style={{
-              fontSize: `${subSize}px`,
-              color: "#10b981",
-              letterSpacing: "0.15em",
-              fontWeight: 700,
-              fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
+              fontSize: `${subSize}px`, color: "#10b981", letterSpacing: "0.15em",
+              fontWeight: 700, fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
             }}>
               {isHub ? "NEXUS ONLINE" : "ACTIVE"}
             </span>
