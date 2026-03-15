@@ -69,26 +69,36 @@ export function addressToLatLng(address: string): LatLng {
 
 // ——————————————————————————————————————————
 // Konversi lat/lng ke koordinat XYZ 3D (permukaan bola)
-// radius = jari-jari globe (default 1.0 unit Three.js)
+// PENTING: radius default = 50 (sesuai referensi globe.js)
 // ——————————————————————————————————————————
-export function latLngToXYZ(lat: number, lng: number, radius: number = 1.0): XYZ {
-  const phi   = (90 - lat) * (Math.PI / 180);   // Polar angle dari atas
-  const theta = (lng + 180) * (Math.PI / 180);  // Azimuthal angle
+export function latLngToXYZ(lat: number, lng: number, radius: number = 50): XYZ {
+  // Menggunakan rumus yang sama dengan globe-utils.js lon2xyz()
+  const lonRad = -(lng * Math.PI) / 180; // Koreksi koordinat Three.js
+  const latRad = (lat * Math.PI) / 180;
 
   return {
-    x: -(radius * Math.sin(phi) * Math.cos(theta)),
-    y: radius * Math.cos(phi),
-    z: radius * Math.sin(phi) * Math.sin(theta),
+    x: radius * Math.cos(latRad) * Math.cos(lonRad),
+    y: radius * Math.sin(latRad),
+    z: radius * Math.cos(latRad) * Math.sin(lonRad),
   };
+}
+
+// ——————————————————————————————————————————
+// lon2xyz: Port langsung dari globe-utils.js referensi
+// Sama persis dengan latLngToXYZ tapi parameter urutan berbeda (R, lon, lat)
+// ——————————————————————————————————————————
+export function lon2xyz(R: number, longitude: number, latitude: number): XYZ {
+  return latLngToXYZ(latitude, longitude, R);
 }
 
 // ——————————————————————————————————————————
 // Shortcut: hash langsung ke XYZ (paling sering dipakai di globe)
 // ——————————————————————————————————————————
-export function hashToXYZ(hash: string, radius: number = 1.0): XYZ {
+export function hashToXYZ(hash: string, radius: number = 50): XYZ {
   const { lat, lng } = hashToLatLng(hash);
   return latLngToXYZ(lat, lng, radius);
 }
+
 
 // ——————————————————————————————————————————
 // Format helpers untuk UI

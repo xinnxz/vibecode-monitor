@@ -1,13 +1,14 @@
 "use client";
 // components/globe/FlyArc.tsx
-// Laser arc melengkung dari titik A ke titik B di permukaan globe.
-// Menggunakan THREE.Line imperatively via useEffect untuk menghindari
-// konflik tipe antara SVGLineElement dan THREE.Line di React Three Fiber.
+// Laser arc melengkung dari titik A ke titik B di globe (R=50).
+// Menggunakan imperative THREE.Line via useEffect.
 
 import { useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
+
+const R = 50;
 
 interface FlyArcProps {
   fromLat: number;
@@ -22,25 +23,24 @@ interface FlyArcProps {
 export function FlyArc({
   fromLat, fromLng,
   toLat,   toLng,
-  color = "#22d3ee",
+  color = "#f3ae76",
   speed = 0.4,
   onDone,
 }: FlyArcProps) {
   const groupRef  = useRef<THREE.Group>(null!);
   const lineRef   = useRef<THREE.Line | null>(null);
   const progress  = useRef(0);
-  const { scene } = useThree();
   const SEGMENTS  = 60;
 
-  // Buat kurva Bezier sekali saja
   const curve = useMemo(() => {
-    const from = latLngToXYZ(fromLat, fromLng, 1.01);
-    const to   = latLngToXYZ(toLat,   toLng,   1.01);
+    const from = latLngToXYZ(fromLat, fromLng, R + 0.5);
+    const to   = latLngToXYZ(toLat,   toLng,   R + 0.5);
+    // Control point: titik tengah di luar bola
     const mid  = new THREE.Vector3(
       (from.x + to.x) / 2,
       (from.y + to.y) / 2,
       (from.z + to.z) / 2
-    ).normalize().multiplyScalar(1.8);
+    ).normalize().multiplyScalar(R * 1.5);
 
     return new THREE.QuadraticBezierCurve3(
       new THREE.Vector3(from.x, from.y, from.z),
@@ -49,13 +49,11 @@ export function FlyArc({
     );
   }, [fromLat, fromLng, toLat, toLng]);
 
-  // Setup THREE.Line imperatively
   useEffect(() => {
     const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(2));
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
     const line = new THREE.Line(geo, mat);
     lineRef.current = line;
-
     if (groupRef.current) groupRef.current.add(line);
 
     return () => {
@@ -64,7 +62,7 @@ export function FlyArc({
       mat.dispose();
       lineRef.current = null;
     };
-  }, [curve, color, scene]);
+  }, [curve, color]);
 
   useFrame((_, delta) => {
     progress.current = Math.min(progress.current + delta * speed, 1);
@@ -72,10 +70,10 @@ export function FlyArc({
     if (!line) return;
 
     const tailStart = Math.max(0, progress.current - 0.35);
-    const pts     = curve.getPoints(SEGMENTS);
-    const startI  = Math.floor(tailStart * SEGMENTS);
-    const endI    = Math.floor(progress.current * SEGMENTS);
-    const subPts  = pts.slice(startI, endI + 1);
+    const pts      = curve.getPoints(SEGMENTS);
+    const startI   = Math.floor(tailStart * SEGMENTS);
+    const endI     = Math.floor(progress.current * SEGMENTS);
+    const subPts   = pts.slice(startI, endI + 1);
 
     if (subPts.length >= 2) {
       line.geometry.setFromPoints(subPts);
