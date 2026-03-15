@@ -14,6 +14,7 @@ import { useTpsStore } from "@/hooks/useTpsStore";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { hashToLatLng } from "@/lib/utils/geo";
 import { HUB_LAT, HUB_LNG } from "@/components/globe/SomniaHub";
+import { VALIDATORS } from "@/components/globe/ValidatorNodes";
 
 // ——— Color System ———
 function getArcColor(txCount: number): string {
@@ -38,6 +39,7 @@ export interface ActiveArc {
   color: string; speed: number; intensity: number;
   isWhale?: boolean;
   isHubBound?: boolean;
+  isRelay?: boolean;
 }
 export interface ActiveBurst {
   id: string; lat: number; lng: number; color: string;
@@ -50,6 +52,32 @@ export interface ActiveNodePulse { // New: Mempool gossip ring
 }
 export interface ActiveRipple {
   id: string; color: string;
+}
+
+// Haversine formula for actual spherical distance
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c;
+}
+
+function findNearestValidator(lat: number, lng: number) {
+  let nearest = VALIDATORS[0];
+  let minDist = Infinity;
+  for (const v of VALIDATORS) {
+    const dist = getDistance(lat, lng, v.lat, v.lng);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = v;
+    }
+  }
+  return nearest;
 }
 
 export function useGlobeTxFeed() {
@@ -88,15 +116,15 @@ export function useGlobeTxFeed() {
 
     // Arrays for Phase 2 & 3 closures
     const hashesData = Array.from({ length: renderCount }).map((_, i) => {
-      // Use available hashes, or fallback/wrap around to create pseudo-random organic routing based on the hash string
       const hash = txHashes[i % txHashes.length] || Date.now().toString(16); 
-      // Add 'i' to the hash to ensure different destinations when reusing the same base hash
       const uniqueHash = `${hash}-${i}`;
       
       const from = hashToLatLng(uniqueHash);
-      const isHubBound = Math.random() < 0.2;
-      const to = isHubBound ? { lat: HUB_LAT, lng: HUB_LNG } : hashToLatLng(uniqueHash + "destination");
-      return { id: `${ts}-${i}`, from, to, isHubBound };
+      
+      // Nearest-Neighbor Constellation Routing
+      const nearestNode = findNearestValidator(from.lat, from.lng);
+
+      return { id: `${ts}-${i}`, from, nearestNode };
     });
 
     // === PHASE 1: INITIATION (Sender Broadcast) T=0s ===
@@ -134,25 +162,50 @@ export function useGlobeTxFeed() {
 
     // === PHASE 3 & 4: VALIDATION ARC T=1000ms ===
     const t2 = setTimeout(() => {
-      const newArcs: ActiveArc[] = hashesData.map(data => {
+      const newArcs: ActiveArc[] = [];
+      const relayArcs: ActiveArc[] = [];
+      
+      hashesData.forEach(data => {
         const baseSpeed = isBurst ? 0.5 : (0.10 + intensity * 0.06);
         const speedSpread = isBurst ? 0.4 : 0.04;
         const arcSpeed = baseSpeed + Math.random() * speedSpread;
 
-        return {
+        // Origin -> Regional Validator Node (First Hop)
+        newArcs.push({
           id: `a-${data.id}`,
           fromLat: data.from.lat,
           fromLng: data.from.lng,
-          toLat: data.to.lat,
-          toLng: data.to.lng,
+          toLat: data.nearestNode.lat,
+          toLng: data.nearestNode.lng,
           color,
           speed: arcSpeed,
           intensity,
-          isHubBound: data.isHubBound,
-        };
+          isHubBound: false,
+        });
+
+        // Regional Validator Node -> Somnia Hub Singapore (Relay Hop)
+        relayArcs.push({
+          id: `relay-${data.id}`,
+          fromLat: data.nearestNode.lat,
+          fromLng: data.nearestNode.lng,
+          toLat: HUB_LAT,
+          toLng: HUB_LNG,
+          color: "#a855f7", // Relay uses hub colors
+          speed: arcSpeed * 1.5, // Resync travels faster on the backbone
+          intensity: intensity * 0.5,
+          isHubBound: true,
+          isRelay: true,
+        });
       });
 
-      setArcs(prev => [...prev, ...newArcs].slice(-300)); // Increased slice to 300 to match renderCount
+      // Show Origin -> Validator immediately
+      setArcs(prev => [...prev, ...newArcs].slice(-300));
+      
+      // Delay the Validator -> Hub relay slightly so it looks like it bounces off the regional node
+      const tRelay = setTimeout(() => {
+        setArcs(prev => [...prev, ...relayArcs].slice(-300));
+      }, 800);
+      timers.push(tRelay);
       
       if (isBurst || Math.random() < 0.3) {
         setHubFlash(true);

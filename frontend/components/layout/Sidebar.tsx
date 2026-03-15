@@ -11,12 +11,12 @@
 // ============================================================
 
 import { ProcessedBlock } from "@/hooks/useBlockStream";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTpsStore } from "@/hooks/useTpsStore";
 
 const HEX = "0123456789abcdef";
 const SLOT_COUNT = 8;
-const TICK_RATE = 1000; // Force a strict 1-second pulse tick to match "Active TX /s"
+// Base tick rate removed, calculating dynamically inside component
 
 function randomHex(len: number): string {
   let s = "0x";
@@ -73,6 +73,8 @@ function useDecodeText(target: string, duration = 700, active = true): string {
 }
 
 // ——— Global Smart Queue Manager ———
+let globalAccumulator = 0; // Tracks incoming TX bursts and decays smoothly
+
 type QueueManager = {
   unseen: ProcessedBlock[];
   history: ProcessedBlock[];
@@ -85,10 +87,12 @@ function SmartCycleSlot({
   index,
   queueManager,
   staggerDelay,
+  currentTps,
 }: {
   index: number;
   queueManager: React.MutableRefObject<QueueManager>;
   staggerDelay: number;
+  currentTps: number;
 }) {
   const [phase, setPhase] = useState<"scanning" | "locking">("scanning");
   const [currentBlock, setCurrentBlock] = useState<ProcessedBlock | null>(null);
@@ -125,8 +129,21 @@ function SmartCycleSlot({
           setCurrentBlock(selectedBlock);
           setPhase("locking");
           setFlash(true);
+          
+          // Add this block's TX strictly to the global visual accumulator
+          globalAccumulator += selectedBlock.txCount;
 
           setTimeout(() => { if (mounted.current) setFlash(false); }, 500);
+
+          // Elastic Pacing: The feed speeds up if a backlog builds up.
+          // If the queue has many blocks (burst), we drain it fast (min 150ms).
+          // If the queue is almost empty, we stretch the display time up to ~1.2s.
+          const unseenCount = q.unseen.length;
+          let elasticTick = 1200; // Base slow rhythm
+          if (unseenCount > 0) {
+            // Get geometrically faster the larger the backlog
+            elasticTick = Math.max(150, 1000 / unseenCount);
+          }
 
           lockTimer = setTimeout(() => {
             if (selectedBlock) {
@@ -140,12 +157,12 @@ function SmartCycleSlot({
                 q.totalProcessedHits++;
               }
             }
-            // Enforce a strict 1-second loop
+            
             runCycle();
-          }, TICK_RATE);
+          }, elasticTick); 
         } else {
           // No blocks at all, keep scanning every 1 second anyway to maintain the tick
-          scanTimer = setTimeout(runCycle, TICK_RATE);
+          scanTimer = setTimeout(runCycle, 1000);
         }
       }, 50); // tiny buffer before lock phase
     };
@@ -266,6 +283,7 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
 
 export function Sidebar() {
   const recentBlocks = useTpsStore((state) => state.recentBlocks);
+  const chainTps = useTpsStore((state) => state.chainTps);
 
   // Shared state manager for all slots
   const queueManager = useRef<QueueManager>({
@@ -280,19 +298,20 @@ export function Sidebar() {
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
-      let totalVisibleTx = 0;
-      queueManager.current.currentlyDisplaying.forEach((txCount) => {
-        totalVisibleTx += txCount;
-      });
+      // Smooth decay algorithm: Lose 3% of the accumulator per tick to create a gliding stop
+      globalAccumulator = globalAccumulator * 0.95;
+      
+      // If it falls below 0.1, snap to 0 to stop micro-decimals
+      if (globalAccumulator < 0.1) globalAccumulator = 0;
 
-      // Calculate absolute real-time visible transactions (since lock duration is so fast now ~350ms)
-      const visualTps = totalVisibleTx;
+      // Calculate absolute real-time visible transactions with the accumulator
+      const visualTps = Math.ceil(globalAccumulator);
 
       if (visualTps !== lastEmitted) {
         useTpsStore.getState().setVisualTps(visualTps);
         lastEmitted = visualTps;
       }
-    }, 400); // Poll 2.5 times a second
+    }, 100); // Fast 100ms poll for smooth numerical countdown
     return () => clearInterval(interval);
   }, []);
 
@@ -367,6 +386,7 @@ export function Sidebar() {
             index={i}
             queueManager={queueManager}
             staggerDelay={staggerDelays[i]} // Shuffled and randomized delays!
+            currentTps={chainTps}
           />
         ))}
       </div>

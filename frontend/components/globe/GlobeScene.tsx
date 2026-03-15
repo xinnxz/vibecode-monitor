@@ -9,9 +9,10 @@
 //   - Impact burst at whale destination
 // ============================================================
 
-import { Suspense, useCallback } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useCallback, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
+import * as THREE from "three";
 
 import { EarthGlobe }       from "./EarthGlobe";
 import { SpaceEnvironment } from "./SpaceEnvironment";
@@ -20,10 +21,21 @@ import { FlyArc }           from "./FlyArc";
 import { WhalePulse }       from "./WhalePulse";
 import { ImpactBurst }      from "./ImpactBurst";
 import { SomniaHub }        from "./SomniaHub";
+import { ValidatorNodes }   from "./ValidatorNodes"; // NEW
 import { HubRipple }        from "./HubRipple";
-import { NodePulse }        from "./NodePulse"; // NEW
-import { HUB_LAT, HUB_LNG } from "./SomniaHub";
+import { NodePulse }        from "./NodePulse";
+import { HUB_LAT, HUB_LNG, earthRotationRef } from "./SomniaHub";
 import { useGlobeTxFeed }   from "@/hooks/useGlobeTxFeed";
+
+function RotatingGroup({ children }: { children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null!);
+  useFrame(() => {
+    if (ref.current) {
+      ref.current.rotation.y = earthRotationRef.y;
+    }
+  });
+  return <group ref={ref}>{children}</group>;
+}
 
 export function GlobeScene() {
   const {
@@ -50,90 +62,85 @@ export function GlobeScene() {
         <SpaceEnvironment />
         <EarthGlobe />
 
-        {/* ——— Somnia Hub — permanent anchor at Singapore ——— */}
-        <SomniaHub tps={tps} flash={hubFlash} />
+        {/* ——— ALL GEOGRAPHIC ACTIVITY WRAPPED TO TRACK EARTH ROTATION ——— */}
+        <RotatingGroup>
+          {/* ——— Constellation Web — 5 Regional Validators ——— */}
+          <ValidatorNodes />
 
-        {/* ——— Hub Ripples — triggered when arcs land ——— */}
-        {ripples.map((r) => (
-          <HubRipple
-            key={r.id}
-            color={r.color}
-            onDone={() => removeRipple(r.id)}
-          />
-        ))}
+          {/* ——— Somnia Hub — permanent anchor at Singapore ——— */}
+          <SomniaHub tps={tps} flash={hubFlash} />
 
-        {/* ——— Node Pings — TX origin markers ——— */}
-        {pings.map((p) => (
-          <NodePing
-            key={p.id}
-            lat={p.lat}
-            lng={p.lng}
-            color={p.color}
-            size={p.size}
-            onDone={() => removePing(p.id)}
-          />
-        ))}
-
-        {/* ——— Phase 2: Mempool Gossip Protocol Pulses ——— */}
-        {nodePulses.map((np) => (
-          <NodePulse
-            key={np.id}
-            lat={np.lat}
-            lng={np.lng}
-            color={np.color}
-            onDone={() => removeNodePulse(np.id)}
-          />
-        ))}
-
-        {/* ——— Phase 2: Mempool Gossip Protocol Pulses ——— */}
-        {nodePulses.map((np) => (
-          <NodePulse
-            key={np.id}
-            lat={np.lat}
-            lng={np.lng}
-            color={np.color}
-            onDone={() => removeNodePulse(np.id)}
-          />
-        ))}
-
-        {/* ——— Laser Arcs — TX flights to/from hub ——— */}
-        {arcs.map((a) => {
-          const isWhale = a.color === "#f59e0b" && a.intensity >= 1.0;
-          return (
-            <FlyArc
-              key={a.id}
-              fromLat={a.fromLat}
-              fromLng={a.fromLng}
-              toLat={a.toLat}
-              toLng={a.toLng}
-              color={a.color}
-              speed={a.speed}
-              intensity={a.intensity}
-              onDone={() => onArcLanded(a.id, isWhale, a.isHubBound)}
+          {/* ——— Hub Ripples — triggered when arcs land ——— */}
+          {ripples.map((r) => (
+            <HubRipple
+              key={r.id}
+              color={r.color}
+              onDone={() => removeRipple(r.id)}
             />
-          );
-        })}
+          ))}
 
-        {/* ——— Impact Bursts — at whale TX destinations ——— */}
-        {bursts.map((b) => (
-          <ImpactBurst
-            key={b.id}
-            lat={b.lat}
-            lng={b.lng}
-            color={b.color}
-            onDone={() => removeBurst(b.id)}
-          />
-        ))}
+          {/* ——— Node Pings — TX origin markers ——— */}
+          {pings.map((p) => (
+            <NodePing
+              key={p.id}
+              lat={p.lat}
+              lng={p.lng}
+              color={p.color}
+              size={p.size}
+              onDone={() => removePing(p.id)}
+            />
+          ))}
 
-        {/* ——— Whale Pulses — large TX visual indicators ——— */}
-        {pulses.map((p) => (
-          <WhalePulse
-            key={p.id}
-            lat={p.lat}
-            lng={p.lng}
-            onDone={() => removePulse(p.id)}
-          />
-        ))}
+          {/* ——— Phase 2: Mempool Gossip Protocol Pulses ——— */}
+          {nodePulses.map((np) => (
+            <NodePulse
+              key={np.id}
+              lat={np.lat}
+              lng={np.lng}
+              color={np.color}
+              onDone={() => removeNodePulse(np.id)}
+            />
+          ))}
+
+          {/* ——— Laser Arcs — TX flights to/from hub ——— */}
+          {arcs.map((a) => {
+            const isWhale = a.color === "#f59e0b" && a.intensity >= 1.0;
+            return (
+              <FlyArc
+                key={a.id}
+                fromLat={a.fromLat}
+                fromLng={a.fromLng}
+                toLat={a.toLat}
+                toLng={a.toLng}
+                color={a.color}
+                speed={a.speed}
+                intensity={a.intensity}
+                onDone={() => onArcLanded(a.id, isWhale, a.isHubBound)}
+              />
+            );
+          })}
+
+          {/* ——— Impact Bursts — at whale TX destinations ——— */}
+          {bursts.map((b) => (
+            <ImpactBurst
+              key={b.id}
+              lat={b.lat}
+              lng={b.lng}
+              color={b.color}
+              onDone={() => removeBurst(b.id)}
+            />
+          ))}
+
+          {/* ——— Whale Pulses — large TX visual indicators ——— */}
+          {pulses.map((p) => (
+            <WhalePulse
+              key={p.id}
+              lat={p.lat}
+              lng={p.lng}
+              onDone={() => removePulse(p.id)}
+            />
+          ))}
+        </RotatingGroup>
 
         <Preload all />
       </Suspense>

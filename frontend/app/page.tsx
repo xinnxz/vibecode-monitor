@@ -174,8 +174,9 @@ function WhaleTicker() {
 export default function DashboardPage() {
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
-  // Read real on-chain TPS from Zustand store (pushed by Sidebar's useBlockStream)
-  const chainTps = useTpsStore((state) => state.chainTps);
+  // Read network state from global store
+  const visualTps = useTpsStore((state) => state.visualTps);
+  const recentBlocks = useTpsStore((state) => state.recentBlocks);
 
   return (
     <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
@@ -189,9 +190,9 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
           <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
           <div className="flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${chainTps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
-            <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${chainTps > 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {chainTps > 0 ? "ONLINE" : "OFFLINE"}
+            <span className={`w-1.5 h-1.5 rounded-full ${recentBlocks.length > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
+            <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${recentBlocks.length > 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {recentBlocks.length > 0 ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
         </div>
@@ -221,8 +222,8 @@ export default function DashboardPage() {
           <StatCard
             label="Active TX"
             value={
-              chainTps > 0
-                ? <span className="flex items-baseline gap-1">{chainTps}<span className="text-[10px] opacity-40">/s</span></span>
+              visualTps > 0
+                ? visualTps
                 : "—"
             }
             sub="On-Chain TX"

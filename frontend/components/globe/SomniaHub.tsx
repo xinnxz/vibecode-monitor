@@ -53,11 +53,6 @@ export function SomniaHub({ tps = 0, flash = false }: SomniaHubProps) {
     timeRef.current += delta;
     const t = timeRef.current;
 
-    // Track earth rotation: rotate the hub group to match the earth
-    if (groupRef.current) {
-      groupRef.current.rotation.y = earthRotationRef.y;
-    }
-
     // Pulse
     const pulseSpeed = 0.8 + Math.min(tps, 30) * 0.07;
     const pulse = (Math.sin(t * pulseSpeed * Math.PI * 2) + 1) / 2;
