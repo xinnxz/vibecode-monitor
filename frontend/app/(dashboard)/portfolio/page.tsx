@@ -77,7 +77,7 @@ function AddressSearch({ value, onChange }: { value: string; onChange: (v: strin
 export default function PortfolioPage() {
   const { address: connectedAddress, isConnected } = useWallet();
   const { stats } = useNetworkStats();
-  const { recentBlocks } = useBlockStream();
+  const { recentBlocks, tps } = useBlockStream();
   const [targetAddress, setTargetAddress] = useState("");
 
   // Auto-load connected wallet
@@ -147,9 +147,9 @@ export default function PortfolioPage() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard label="Total TX" value={formatCompact(stats.totalTransactions)} icon="⚡" color="text-purple-400" />
-              <StatCard label="Total Volume" value={`${formatCompact(Math.floor(Number(stats.totalVolume) / 1e18))} STT`} icon="💎" color="text-cyan-400" />
+              <StatCard label="Total Volume" value={`${formatCompact(stats.totalVolumeSTT)} STT`} icon="💎" color="text-cyan-400" />
               <StatCard label="Unique Wallets" value={formatCompact(stats.uniqueAddressCount)} icon="👤" color="text-emerald-400" />
-              <StatCard label="Avg TPS" value={stats.averageTps > 0 ? stats.averageTps.toFixed(1) : "—"} icon="🚀" color="text-yellow-400" />
+              <StatCard label="Live TPS" value={tps > 0 ? tps.toString() : "—"} icon="🚀" color="text-yellow-400" />
             </div>
           </div>
 
