@@ -1,17 +1,21 @@
 "use client";
 // components/globe/FlyArc.tsx
 // ============================================================
-// Neon laser arc dari titik A ke titik B di globe (R=50).
-// Dual-layer rendering: terang tipis (core) + halo tebal transparan (glow).
-// Pre-allocated buffer + drawRange untuk performa GPU optimal.
+// Neon laser arc from point A to point B.
+// Technique ported from reference globe.js:
+//   Layer 1: Static faint path line (stays persistent until arc done)
+//   Layer 2: Animated comet — THREE.Points travelling along path
+//            with size gradient (small tail → large head) via custom shader
+// Pre-allocated buffers, zero GPU realloc per frame.
 // ============================================================
 
 import { useRef, useMemo, useEffect } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
 
 const R = 50;
+const SEGMENTS = 80;
 
 interface FlyArcProps {
   fromLat: number;
@@ -20,7 +24,7 @@ interface FlyArcProps {
   toLng:   number;
   color?:  string;
   speed?:  number;
-  intensity?: number; // 0–1, affects thickness and brightness
+  intensity?: number; // 0–1
   onDone?: () => void;
 }
 
@@ -32,21 +36,23 @@ export function FlyArc({
   intensity = 0.5,
   onDone,
 }: FlyArcProps) {
-  const groupRef  = useRef<THREE.Group>(null!);
-  const coreRef   = useRef<THREE.Line | null>(null);
-  const glowRef   = useRef<THREE.Line | null>(null);
-  const progress  = useRef(0);
-  const SEGMENTS  = 60;
+  const groupRef = useRef<THREE.Group>(null!);
+  const { scene } = useThree();
+  const progress = useRef(0);
+  const linesAdded = useRef(false);
 
-  // Bezier curve from A to B
+  const threeColor = useMemo(() => new THREE.Color(color), [color]);
+
+  // Bezier curve
   const curve = useMemo(() => {
     const from = latLngToXYZ(fromLat, fromLng, R + 0.5);
-    const to   = latLngToXYZ(toLat,   toLng,   R + 0.5);
-    const mid  = new THREE.Vector3(
+    const to   = latLngToXYZ(toLat, toLng, R + 0.5);
+    const arcHeight = R * (1.2 + intensity * 0.5);
+    const mid = new THREE.Vector3(
       (from.x + to.x) / 2,
       (from.y + to.y) / 2,
       (from.z + to.z) / 2
-    ).normalize().multiplyScalar(R * (1.3 + intensity * 0.4)); // Higher intensity = taller arc
+    ).normalize().multiplyScalar(arcHeight);
 
     return new THREE.QuadraticBezierCurve3(
       new THREE.Vector3(from.x, from.y, from.z),
@@ -55,95 +61,137 @@ export function FlyArc({
     );
   }, [fromLat, fromLng, toLat, toLng, intensity]);
 
-  useEffect(() => {
-    // Pre-allocate buffer with ALL segment points
-    const allPts = curve.getPoints(SEGMENTS);
-    const positions = new Float32Array(allPts.length * 3);
-    allPts.forEach((v, i) => {
+  // All points along the full curve (pre-computed)
+  const allPoints = useMemo(() => curve.getPoints(SEGMENTS), [curve]);
+
+  // ——— Layer 1: Static faint path line (full arc) ———
+  const pathLine = useMemo(() => {
+    const positions = new Float32Array(allPoints.length * 3);
+    allPoints.forEach((v, i) => {
       positions[i * 3]     = v.x;
       positions[i * 3 + 1] = v.y;
       positions[i * 3 + 2] = v.z;
     });
-
-    // Shared geometry for both core and glow
-    const coreGeo = new THREE.BufferGeometry();
-    coreGeo.setAttribute("position", new THREE.BufferAttribute(positions.slice(), 3));
-    coreGeo.setDrawRange(0, 0);
-
-    const glowGeo = new THREE.BufferGeometry();
-    glowGeo.setAttribute("position", new THREE.BufferAttribute(positions.slice(), 3));
-    glowGeo.setDrawRange(0, 0);
-
-    // Core: thin bright line
-    const coreMat = new THREE.LineBasicMaterial({
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({
       color,
       transparent: true,
-      opacity: 0.9,
-      linewidth: 1,
-    });
-
-    // Glow: thick transparent halo with additive blending
-    const glowMat = new THREE.LineBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.15 + intensity * 0.2,
-      linewidth: 1,
-      blending: THREE.AdditiveBlending,
+      opacity: 0.12 + intensity * 0.08,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
     });
+    return new THREE.Line(geo, mat);
+  }, [allPoints, color, intensity]);
 
-    const coreLine = new THREE.Line(coreGeo, coreMat);
-    const glowLine = new THREE.Line(glowGeo, glowMat);
+  // ——— Layer 2: Comet — THREE.Points with gradient size shader ———
+  // Comet covers ~30% of arc length, head bright + big, tail dim + tiny
+  const COMET_POINTS = 60;
+  const cometGeo = useMemo(() => {
+    const positions = new Float32Array(COMET_POINTS * 3);
+    const percents  = new Float32Array(COMET_POINTS); // 0=tail, 1=head — controls size
+    const colors    = new Float32Array(COMET_POINTS * 3);
 
-    coreRef.current = coreLine;
-    glowRef.current = glowLine;
+    // Initialize at origin; useFrame updates per-frame
+    const col1 = new THREE.Color(color).multiplyScalar(0.6);
+    const col2 = new THREE.Color(color);
 
-    if (groupRef.current) {
-      groupRef.current.add(glowLine); // Glow behind
-      groupRef.current.add(coreLine); // Core in front
+    for (let i = 0; i < COMET_POINTS; i++) {
+      positions[i * 3] = 0;
+      positions[i * 3 + 1] = 0;
+      positions[i * 3 + 2] = 0;
+      percents[i] = i / COMET_POINTS;
+      const c = col1.clone().lerp(col2, i / COMET_POINTS);
+      colors[i * 3]     = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
     }
 
-    return () => {
-      if (groupRef.current) {
-        groupRef.current.remove(coreLine);
-        groupRef.current.remove(glowLine);
-      }
-      coreGeo.dispose();
-      glowGeo.dispose();
-      coreMat.dispose();
-      glowMat.dispose();
-      coreRef.current = null;
-      glowRef.current = null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("percent",  new THREE.BufferAttribute(percents, 1));
+    geo.setAttribute("color",    new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }, [color]);
+
+  // Comet material with custom vertex shader for size gradient
+  const cometMat = useMemo(() => {
+    const mat = new THREE.PointsMaterial({
+      size: 1.4 + intensity * 0.8,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexColors: true,
+      sizeAttenuation: true,
+    });
+
+    // Custom shader: gl_PointSize = percent * size (head big, tail small)
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace(
+        "void main() {",
+        "attribute float percent;\nvoid main() {"
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        "gl_PointSize = size;",
+        "gl_PointSize = percent * size;"
+      );
     };
-  }, [curve, color, intensity]);
+
+    return mat;
+  }, [intensity]);
+
+  const cometPoints = useMemo(
+    () => new THREE.Points(cometGeo, cometMat),
+    [cometGeo, cometMat]
+  );
+
+  useEffect(() => {
+    if (groupRef.current && !linesAdded.current) {
+      groupRef.current.add(pathLine);
+      groupRef.current.add(cometPoints);
+      linesAdded.current = true;
+    }
+    return () => {
+      pathLine.geometry.dispose();
+      (pathLine.material as THREE.Material).dispose();
+      cometGeo.dispose();
+      cometMat.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useFrame((_, delta) => {
-    // EaseInOut for smooth launch + landing feel
-    const rawProgress = Math.min(progress.current + delta * speed, 1);
-    progress.current = rawProgress;
-    const eased = rawProgress < 0.5
-      ? 2 * rawProgress * rawProgress
-      : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
+    // EaseInOut
+    const raw = Math.min(progress.current + delta * speed, 1);
+    progress.current = raw;
+    const eased = raw < 0.5
+      ? 2 * raw * raw
+      : 1 - Math.pow(-2 * raw + 2, 2) / 2;
 
-    const core = coreRef.current;
-    const glow = glowRef.current;
-    if (!core || !glow) return;
+    // Comet: advance 30% window along arc
+    const TAIL_FRAC = 0.30;
+    const headIdx = Math.floor(eased * SEGMENTS);
+    const tailIdx = Math.max(0, Math.floor((eased - TAIL_FRAC) * SEGMENTS));
 
-    const tailStart = Math.max(0, eased - 0.35);
-    const startI = Math.floor(tailStart * SEGMENTS);
-    const endI   = Math.floor(eased * SEGMENTS);
-    const count  = Math.max(0, endI - startI + 1);
+    const posAttr = cometGeo.getAttribute("position") as THREE.BufferAttribute;
+    const totalSpan = headIdx - tailIdx;
 
-    // Sync draw range on both layers
-    core.geometry.setDrawRange(startI, count);
-    glow.geometry.setDrawRange(startI, count);
+    for (let i = 0; i < COMET_POINTS; i++) {
+      const segIdx = tailIdx + Math.round((i / COMET_POINTS) * totalSpan);
+      const pt = allPoints[Math.min(segIdx, SEGMENTS)];
+      posAttr.setXYZ(i, pt.x, pt.y, pt.z);
+    }
+    posAttr.needsUpdate = true;
 
-    // Fade out as arc reaches destination
-    const fadeOut = rawProgress > 0.7 ? (1 - rawProgress) / 0.3 : 1;
-    (core.material as THREE.LineBasicMaterial).opacity = 0.9 * fadeOut;
-    (glow.material as THREE.LineBasicMaterial).opacity = (0.15 + intensity * 0.2) * fadeOut;
+    // Fade path line as comet passes (nice trailing effect)
+    const pathMat = pathLine.material as THREE.LineBasicMaterial;
+    pathMat.opacity = (0.12 + intensity * 0.08) * Math.min(eased * 3, 1);
 
-    if (rawProgress >= 1) onDone?.();
+    // Fade comet near destination
+    cometMat.opacity = raw > 0.8 ? (1 - raw) / 0.2 : 0.9;
+
+    if (raw >= 1) onDone?.();
   });
 
   return <group ref={groupRef} />;
