@@ -12,26 +12,17 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useBlockStream } from "@/hooks/useBlockStream";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { useNetworkStats } from "@/hooks/useNetworkStats";
+import { useState, useEffect, useRef } from "react";
 import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
 
-// Dynamic import for GlobeScene to prevent SSR
-const GlobeScene = dynamic(
-  () => import("@/components/globe/GlobeScene").then((m) => ({ default: m.GlobeScene })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center w-full h-full bg-[#010306]">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-full border-2 border-white/5 border-t-purple-500 animate-spin mx-auto mb-6 shadow-[0_0_15px_#a855f7]" />
-          <p className="text-purple-400 font-mono text-xs tracking-widest uppercase animate-pulse">Initializing Telemetry...</p>
-        </div>
-      </div>
-    ),
-  }
-);
+      {/* ——— Main 3D Environment Overlay Placeholder (Rendered in layout.tsx) ——— */}
+      <main className="absolute inset-0 z-0 pointer-events-none">
+        {/* Cinematic Vignette Overlay */}
+        <div className="absolute inset-0 vignette pointer-events-none z-0" />
+      </main>
 
-// ——— Premium HUD Stat Card (Corner Bracket Style) ———
+// ——— Premium HUD Stat Card (Corner Bracket Style with Standby Telemetry) ———
 function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
   label: string;
   value: string | number;
@@ -39,41 +30,67 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
   colorClass?: string;
   borderColor?: string;
 }) {
+  const isIdle = value === 0 || value === "0" || value === "—";
+  const isTps = label.toUpperCase().includes("TPS") || label.toUpperCase().includes("ACTIVE TX");
+
+  const targetRef = useRef(String(value));
+
+  useEffect(() => {
+    targetRef.current = String(value);
+  }, [value]);
+
+  // Specific TV Glitch effect ONLY for Live TPS card
+  const [tpsGlitch, setTpsGlitch] = useState(false);
+
+  useEffect(() => {
+    if (!isTps) return;
+    const interval = setInterval(() => {
+      setTpsGlitch(true);
+      setTimeout(() => setTpsGlitch(false), 250); // Glitch lasts 250ms
+    }, 1000); // exactly every second!
+    return () => clearInterval(interval);
+  }, [isTps]);
+
+  const displayValue = value;
+
   return (
     <motion.div
       layout
-      className="relative min-w-[160px] group cursor-default pointer-events-auto"
+      className="relative min-w-[160px] group cursor-default pointer-events-auto overflow-hidden"
       style={{
-        background: "linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.15), transparent)",
+        background: isIdle
+          ? "linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1), transparent)"
+          : "linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.15), transparent)",
       }}
     >
+      {/* Background Pulse Animation for Idle state */}
+      {isIdle && (
+        <motion.div
+          animate={{ opacity: [0, 0.05, 0] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          style={{ position: "absolute", inset: 0, background: borderColor }}
+        />
+      )}
+
       {/* Top-Left Corner Bracket ⌐ */}
-      <div
+      <motion.div
+        animate={isIdle ? { opacity: [0.4, 0.9, 0.4] } : { opacity: 0.8 }}
+        transition={isIdle ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "12px",
-          height: "12px",
-          borderTop: `2px solid ${borderColor}`,
-          borderLeft: `2px solid ${borderColor}`,
-          opacity: 0.7,
+          position: "absolute", top: 0, left: 0, width: "12px", height: "12px",
+          borderTop: `2px solid ${borderColor}`, borderLeft: `2px solid ${borderColor}`,
           transition: "opacity 0.3s",
         }}
         className="group-hover:opacity-100"
       />
 
       {/* Bottom-Right Corner Bracket ¬ */}
-      <div
+      <motion.div
+        animate={isIdle ? { opacity: [0.4, 0.9, 0.4] } : { opacity: 0.8 }}
+        transition={isIdle ? { duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 } : {}}
         style={{
-          position: "absolute",
-          bottom: 0,
-          right: 0,
-          width: "12px",
-          height: "12px",
-          borderBottom: `2px solid ${borderColor}`,
-          borderRight: `2px solid ${borderColor}`,
-          opacity: 0.7,
+          position: "absolute", bottom: 0, right: 0, width: "12px", height: "12px",
+          borderBottom: `2px solid ${borderColor}`, borderRight: `2px solid ${borderColor}`,
           transition: "opacity 0.3s",
         }}
         className="group-hover:opacity-100"
@@ -85,15 +102,39 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
         style={{ padding: "14px 24px 14px 18px" }}
       >
         <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
-        <motion.p
-          key={String(value)}
-          initial={{ opacity: 0, x: -5 }}
-          animate={{ opacity: 1, x: 0 }}
-          className={`text-xl font-bold font-display tracking-wider ${colorClass} mt-1`}
-        >
-          {value}
-        </motion.p>
+
+        <div className="flex items-baseline gap-2 mt-1">
+          <motion.p
+            key={String(value)} // Re-animate entry on real value change, not jitter
+            initial={{ opacity: 0, x: -5 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`text-xl font-bold font-display tracking-wider ${isIdle && !tpsGlitch ? "text-white/80" : colorClass} ${tpsGlitch ? "tv-glitch" : ""}`}
+            data-text={displayValue}
+          >
+            {displayValue}
+          </motion.p>
+          {isIdle && (
+            <span className="text-[8px] font-mono text-white/60 uppercase tracking-widest">
+              Awaiting
+            </span>
+          )}
+        </div>
+
         {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-1 uppercase">{sub}</p>}
+
+        {/* Idle Waveform / EKG line */}
+        {isIdle && (
+          <div className="absolute bottom-2 left-4 right-6 h-3 flex items-end gap-[2px] opacity-50 pointer-events-none">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{ height: [`20%`, `${Math.random() * 80 + 20}%`, `20%`] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                style={{ flex: 1, background: borderColor, borderRadius: "1px" }}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -140,92 +181,90 @@ export default function DashboardPage() {
   const { tps } = useBlockStream();
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
+  const [visualTps, setVisualTps] = useState(0);
 
   return (
-    <div className="fixed inset-0 bg-[#010204] overflow-hidden">
+    <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
 
-        {/* Corner Accents (screen edges) */}
-        <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 z-30 pointer-events-none" />
+      {/* Corner Accents (screen edges) */}
+      <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 z-30 pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 z-30 pointer-events-none" />
 
-        {/* ——— Vertical Telemetry (Left Edge) ——— */}
-        <div className="absolute top-36 left-8 flex flex-col z-20 pointer-events-none opacity-50" style={{ gap: "56px" }}>
-          <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-            <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
-            <div className="flex items-center gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full ${tps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
-              <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${tps > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {tps > 0 ? "ONLINE" : "OFFLINE"}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-            <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Block Hash</span>
-            <span className="text-[11px] font-bold tracking-[0.2em] font-mono text-purple-400">
-              {stats.totalTransactions > 0 ? `#${(stats.totalTransactions * 123).toString().substring(0, 6)}` : "AWAITING"}
+      {/* ——— Vertical Telemetry (Left Edge) ——— */}
+      <div className="absolute top-36 left-8 flex flex-col z-20 pointer-events-none opacity-50" style={{ gap: "56px" }}>
+        <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+          <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
+          <div className="flex items-center gap-2">
+            <span className={`w-1.5 h-1.5 rounded-full ${tps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
+            <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${tps > 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {tps > 0 ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
         </div>
-
-        {/* ——— Navbar ——— */}
-        <Navbar />
-
-        {/* ——— Main 3D Environment (Full Screen) ——— */}
-        <main className="absolute inset-0 z-0">
-          <div className="w-full h-full mix-blend-screen">
-            <GlobeScene />
-          </div>
-
-          {/* Cinematic Vignette Overlay */}
-          <div className="absolute inset-0 vignette pointer-events-none z-0" />
-        </main>
-
-        {/* ——— Foreground UI Elements ——— */}
-        <div className="absolute inset-0 z-10 pointer-events-none">
-
-          {/* HUD Stats Cards (Bottom Left) */}
-          <div
-            className="absolute pointer-events-auto"
-            style={{ bottom: "40px", left: "40px", display: "flex", flexWrap: "wrap", gap: "24px" }}
-          >
-            <StatCard
-              label="Total TX"
-              value={formatCompact(stats.totalTransactions)}
-              sub="All Time"
-              colorClass="text-purple-400"
-              borderColor="#a855f7"
-            />
-            <StatCard
-              label="Live TPS"
-              value={tps > 0 ? tps : "—"}
-              sub="Transactions/Sec"
-              colorClass="text-indigo-400"
-              borderColor="#818cf8"
-            />
-            <StatCard
-              label="Wallets"
-              value={formatCompact(stats.uniqueAddressCount)}
-              sub="Unique Tracking"
-              colorClass="text-blue-400"
-              borderColor="#3b82f6"
-            />
-            <StatCard
-              label="Whales"
-              value={whaleAlerts.length}
-              sub="Detected Anomaly"
-              colorClass="text-red-400"
-              borderColor="#ef4444"
-            />
-          </div>
-
-          {/* ——— Sidebar (Floating Panel Right) ——— */}
-          <div className="pointer-events-auto">
-            <Sidebar />
-          </div>
-
-          {/* ——— Whale Ticker (Bottom Edge) ——— */}
-          <WhaleTicker />
+        <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+          <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Block Hash</span>
+          <span className="text-[11px] font-bold tracking-[0.2em] font-mono text-purple-400">
+            {stats.totalTransactions > 0 ? `#${(stats.totalTransactions * 123).toString().substring(0, 6)}` : "AWAITING"}
+          </span>
         </div>
+      </div>
+
+      {/* ——— Navbar ——— */}
+      <Navbar />
+
+      {/* ——— Main Environment Overlay (Full Screen) ——— */}
+      <main className="absolute inset-0 z-0">
+        <div className="w-full h-full mix-blend-screen pointer-events-none" />
+        {/* Cinematic Vignette Overlay */}
+        <div className="absolute inset-0 vignette pointer-events-none z-0" />
+      </main>
+
+      {/* ——— Foreground UI Elements ——— */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+
+        {/* HUD Stats Cards (Bottom Left) */}
+        <div
+          className="absolute pointer-events-auto"
+          style={{ bottom: "40px", left: "40px", display: "flex", flexWrap: "wrap", gap: "24px" }}
+        >
+          <StatCard
+            label="Total TX"
+            value={formatCompact(stats.totalTransactions)}
+            sub="All Time"
+            colorClass="text-purple-400"
+            borderColor="#a855f7"
+          />
+          <StatCard
+            label="Active TX"
+            value={visualTps > 0 ? visualTps : "—"}
+            sub="Transactions"
+            colorClass="text-indigo-400"
+            borderColor="#818cf8"
+          />
+          <StatCard
+            label="Wallets"
+            value={formatCompact(stats.uniqueAddressCount)}
+            sub="Unique Tracking"
+            colorClass="text-blue-400"
+            borderColor="#3b82f6"
+          />
+          <StatCard
+            label="Whales"
+            value={whaleAlerts.length}
+            sub="Detected Anomaly"
+            colorClass="text-red-400"
+            borderColor="#ef4444"
+          />
+        </div>
+
+        {/* ——— Sidebar (Floating Panel Right) ——— */}
+        <div className="pointer-events-auto">
+          <Sidebar onVisualTpsUpdate={setVisualTps} />
+        </div>
+
+        {/* ——— Whale Ticker (Bottom Edge) ——— */}
+        <WhaleTicker />
+      </div>
 
     </div>
   );

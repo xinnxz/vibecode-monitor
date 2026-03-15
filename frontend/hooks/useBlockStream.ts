@@ -47,6 +47,7 @@ export function useBlockStream(): UseBlockStreamReturn {
   const [latestBlock, setLatestBlock] = useState<ProcessedBlock | null>(null);
   const [recentBlocks, setRecentBlocks] = useState<ProcessedBlock[]>([]);
   const [tps, setTps] = useState<number>(0);
+  const targetTpsRef = useRef(0);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,19 +56,39 @@ export function useBlockStream(): UseBlockStreamReturn {
   const blocksRef = useRef<ProcessedBlock[]>([]);
 
   // ——————————————————————————————————————————
+  // Smooth TPS Decay Logic (Sync visual Sidebar)
+  // ——————————————————————————————————————————
+  useEffect(() => {
+    // Sidebar takes ~2-3s per slot to process a block visually.
+    // If the network drops to 0 instantly, we decay the TPS down slowly by 20% every 800ms
+    // so the number stays > 0 as long as the Sidebar is visibly busy processing the queue.
+    const timer = setInterval(() => {
+      setTps(prev => {
+        const target = targetTpsRef.current;
+        if (prev <= target) return target; // Jump UP instantly handled by network block, but just in case
+        
+        // Smooth decay DOWN (simulating UI processing queue burning down)
+        const decayed = Math.max(target, Math.floor(prev * 0.85) - 1);
+        return decayed > 0 ? decayed : 0;
+      });
+    }, 800);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ——————————————————————————————————————————
   // Hitung TPS dari N blok terakhir
   // ——————————————————————————————————————————
   const calculateTPS = useCallback((blocks: ProcessedBlock[]): number => {
     if (blocks.length < 2) return 0;
 
-    // Ambil N blok terakhir untuk kalkulasi
-    const window = blocks.slice(-TPS_WINDOW);
+    // Ambil N blok terakhir untuk kalkulasi kecepatan instan
+    const window = blocks.slice(-3); // Gunakan window sangat kecil (3 blok) agar angka loncat agresif sesuai sidebar
     if (window.length < 2) return 0;
 
     const totalTx = window.reduce((sum, b) => sum + b.txCount, 0);
     const timespan = window[window.length - 1].timestamp - window[0].timestamp;
 
-    if (timespan <= 0) return 0;
+    if (timespan <= 0) return window[window.length - 1].txCount; // Fallback jika timestamp aneh
     return Math.round(totalTx / timespan);
   }, []);
 
@@ -111,7 +132,10 @@ export function useBlockStream(): UseBlockStreamReturn {
             if (mounted) {
               setLatestBlock(processed);
               setRecentBlocks([...blocksRef.current]);
-              setTps(calculateTPS(blocksRef.current));
+              
+              const rawTps = calculateTPS(blocksRef.current);
+              targetTpsRef.current = rawTps;
+              setTps(prev => rawTps > prev ? rawTps : prev); // Spike UP instantly
             }
           } catch (err) {
             // Abaikan error per-blok (mungkin RPC timeout sesekali)

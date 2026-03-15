@@ -12,7 +12,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative w-full h-dvh overflow-hidden bg-[#020408]">
+    <div className="relative w-full h-dvh overflow-hidden bg-black/40 backdrop-blur-md pointer-events-auto">
       {/* Subtle grid overlay — cyberpunk feel */}
       <div
         className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
@@ -30,14 +30,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         style={{ background: "radial-gradient(ellipse 70% 70% at 40% 50%, rgba(168,85,247,0.06) 0%, transparent 70%)" }}
       />
 
-      <Navbar />
-
       {/* Main content scroll area (adjusted for new floating UI sizing) */}
-      <main className="absolute inset-0 pt-28 pl-6 pr-[360px] pb-6 overflow-y-auto z-10">
+      <main className="absolute inset-0 pt-32 pl-12 pr-[400px] pb-12 overflow-y-auto z-10">
         {children}
       </main>
 
-      <Sidebar />
     </div>
   );
 }
