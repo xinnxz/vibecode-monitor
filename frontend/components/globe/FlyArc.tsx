@@ -14,7 +14,7 @@
 //   Layer 2: Comet particles travelling along path (looping once)
 // ============================================================
 
-import { useRef, useMemo, useEffect, useCallback } from "react";
+import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
@@ -134,6 +134,19 @@ export function FlyArc({
   const phase = useRef<"comet" | "ghost">("comet");
   const addedRef = useRef(false);
 
+  // Circular texture to prevent large particles from looking like squares
+  const circleTex = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d")!;
+    ctx.beginPath();
+    ctx.arc(32, 32, 30, 0, Math.PI * 2);
+    ctx.fillStyle = "white";
+    ctx.fill();
+    return new THREE.CanvasTexture(canvas);
+  }, []);
+
   // Generate high-arc points using reference algorithm
   const arcPoints = useMemo(
     () => generateArcPoints(fromLat, fromLng, toLat, toLng, ARC_SEGMENTS).points,
@@ -190,6 +203,7 @@ export function FlyArc({
       blending: THREE.AdditiveBlending,
       vertexColors: true,
       sizeAttenuation: true,
+      map: circleTex,
     });
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
@@ -224,8 +238,9 @@ export function FlyArc({
       const raw = Math.min(progress.current + delta * speed, 1);
       progress.current = raw;
 
-      // EaseInOut for "throwing" feel
-      const eased = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+      // Suction Effect Easing: Starts slow, finishes incredibly fast (like being sucked into a validator)
+      // Math.pow(raw, 3) gives an exponential acceleration curve
+      const eased = Math.pow(raw, 3);
 
       // Update comet positions (30% tail)
       const headIdx = Math.floor(eased * ARC_SEGMENTS);

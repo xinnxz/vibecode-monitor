@@ -37,12 +37,16 @@ export interface ActiveArc {
   toLat: number; toLng: number;
   color: string; speed: number; intensity: number;
   isWhale?: boolean;
+  isHubBound?: boolean;
 }
 export interface ActiveBurst {
   id: string; lat: number; lng: number; color: string;
 }
 export interface ActivePulse {
   id: string; lat: number; lng: number;
+}
+export interface ActiveNodePulse { // New: Mempool gossip ring
+  id: string; lat: number; lng: number; color: string;
 }
 export interface ActiveRipple {
   id: string; color: string;
@@ -53,6 +57,7 @@ export function useGlobeTxFeed() {
   const [arcs,    setArcs]    = useState<ActiveArc[]>([]);
   const [bursts,  setBursts]  = useState<ActiveBurst[]>([]);
   const [pulses,  setPulses]  = useState<ActivePulse[]>([]);
+  const [nodePulses, setNodePulses] = useState<ActiveNodePulse[]>([]); // New state
   const [ripples, setRipples] = useState<ActiveRipple[]>([]);
   const [hubFlash, setHubFlash] = useState(false);
 
@@ -61,7 +66,7 @@ export function useGlobeTxFeed() {
   const lastBlockRef = useRef<number | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ——— New block → EXACT number of arcs matching txCount ———
+  // ——— STAGED ANIMATION QUEUE (The Pulse of the Network) ———
   useEffect(() => {
     if (!latestBlock || latestBlock.number === lastBlockRef.current) return;
     lastBlockRef.current = latestBlock.number;
@@ -70,45 +75,76 @@ export function useGlobeTxFeed() {
     const txCount = latestBlock.txCount;
     const color = getArcColor(txCount);
     const intensity = getIntensity(txCount);
-
-    // EXACT: 1 arc per TX — no padding, no fakes
     const txHashes = latestBlock.transactions;
+    const isBurst = txCount >= 50;
+
+    // Phase 1 arrays (T = 0s)
     const newPings: ActivePing[] = [];
-    const newArcs: ActiveArc[] = [];
-
-    txHashes.forEach((hash, i) => {
+    
+    // Arrays for Phase 2 & 3 closures
+    const hashesData = txHashes.map((hash, i) => {
       const from = hashToLatLng(hash);
-      const id = `${ts}-${i}`;
+      const isHubBound = Math.random() < 0.2;
+      const to = isHubBound ? { lat: HUB_LAT, lng: HUB_LNG } : hashToLatLng(hash + "destination");
+      return { id: `${ts}-${i}`, from, to, isHubBound };
+    });
 
+    // === PHASE 1: INITIATION (Sender Broadcast) T=0s ===
+    hashesData.forEach((data) => {
       newPings.push({
-        id: `p-${id}`,
-        lat: from.lat,
-        lng: from.lng,
+        id: `p-${data.id}`,
+        lat: data.from.lat,
+        lng: data.from.lng,
         color,
         size: 0.4 + intensity * 0.6,
       });
-
-      newArcs.push({
-        id: `a-${id}`,
-        fromLat: from.lat,
-        fromLng: from.lng,
-        toLat: HUB_LAT,
-        toLng: HUB_LNG,
-        color,
-        // Speed: slow enough to see, with slight randomness
-        speed: 0.10 + intensity * 0.06 + Math.random() * 0.04,
-        intensity,
-      });
     });
-
-    // Ghost trails make old arcs persist — so we allow high limits
+    // Immediately show pings
     setPings(prev => [...prev, ...newPings].slice(-100));
-    setArcs(prev => [...prev, ...newArcs].slice(-150));
 
-    // Flash hub
-    setHubFlash(true);
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
+    // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=500ms ===
+    // (Only if not a giant burst to save performance)
+    if (!isBurst) {
+      setTimeout(() => {
+        const newGossip: ActiveNodePulse[] = hashesData.map(data => ({
+          id: `gossip-${data.id}`,
+          lat: data.from.lat,
+          lng: data.from.lng,
+          color: "#4ade80", // Greenish for gossip spread
+        }));
+        setNodePulses(prev => [...prev, ...newGossip].slice(-50));
+      }, 500);
+    }
+
+    // === PHASE 3 & 4: VALIDATION ARC (Sucked to Hub/Target) T=1000ms ===
+    setTimeout(() => {
+      const newArcs: ActiveArc[] = hashesData.map(data => {
+        const baseSpeed = isBurst ? 0.5 : (0.10 + intensity * 0.06);
+        const speedSpread = isBurst ? 0.4 : 0.04;
+        const arcSpeed = baseSpeed + Math.random() * speedSpread;
+
+        return {
+          id: `a-${data.id}`,
+          fromLat: data.from.lat,
+          fromLng: data.from.lng,
+          toLat: data.to.lat,
+          toLng: data.to.lng,
+          color,
+          speed: arcSpeed,
+          intensity,
+          isHubBound: data.isHubBound,
+        };
+      });
+
+      setArcs(prev => [...prev, ...newArcs].slice(-150));
+      
+      // Flash hub when huge blocks arrive (representing massive validation effort)
+      if (isBurst || Math.random() < 0.3) {
+        setHubFlash(true);
+        if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
+      }
+    }, 1000);
 
   }, [latestBlock]);
 
@@ -137,25 +173,26 @@ export function useGlobeTxFeed() {
   }, [latestAlert]);
 
   // ——— Remove callbacks ———
-  const removePing   = useCallback((id: string) => setPings(p => p.filter(x => x.id !== id)), []);
-  const removeArc    = useCallback((id: string) => setArcs(p => p.filter(x => x.id !== id)), []);
-  const removeBurst  = useCallback((id: string) => setBursts(p => p.filter(x => x.id !== id)), []);
-  const removePulse  = useCallback((id: string) => setPulses(p => p.filter(x => x.id !== id)), []);
-  const removeRipple = useCallback((id: string) => setRipples(p => p.filter(x => x.id !== id)), []);
+  const removePing      = useCallback((id: string) => setPings(p => p.filter(x => x.id !== id)), []);
+  const removeArc       = useCallback((id: string) => setArcs(p => p.filter(x => x.id !== id)), []);
+  const removeBurst     = useCallback((id: string) => setBursts(p => p.filter(x => x.id !== id)), []);
+  const removePulse     = useCallback((id: string) => setPulses(p => p.filter(x => x.id !== id)), []);
+  const removeNodePulse = useCallback((id: string) => setNodePulses(p => p.filter(x => x.id !== id)), []);
+  const removeRipple    = useCallback((id: string) => setRipples(p => p.filter(x => x.id !== id)), []);
 
-  // Arc landing at hub → hub ripple
-  const onArcLanded = useCallback((arcId: string, isWhale: boolean) => {
+  // Arc landing at destination → ripple if it lands at hub
+  const onArcLanded = useCallback((arcId: string, isWhale: boolean, isHubBound?: boolean) => {
     removeArc(arcId);
-    if (!isWhale) {
+    if (isHubBound && !isWhale) {
       const rippleId = `ripple-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       setRipples(prev => [...prev, { id: rippleId, color: "#a855f7" }].slice(-10));
     }
   }, [removeArc]);
 
   return {
-    pings, arcs, bursts, pulses, ripples,
+    pings, arcs, bursts, pulses, ripples, nodePulses,
     hubFlash, tps,
     removePing, removeArc, onArcLanded,
-    removeBurst, removePulse, removeRipple,
+    removeBurst, removePulse, removeRipple, removeNodePulse,
   };
 }

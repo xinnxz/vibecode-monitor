@@ -106,7 +106,7 @@ export function EarthGlobe() {
   // ============================================================
   // KEPLERIAN LUNAR ORBIT — Real Physics
   // ============================================================
-  const ORBIT_A = R + 35;                        // Semi-major axis (scaled)
+  const ORBIT_A = R + 80;                        // Visually pleasing 'agak jauh' distance (not real 60x ratio)
   const ORBIT_E = 0.0549;                        // Moon's actual eccentricity
   const ORBIT_I = 5.145 * Math.PI / 180;         // Orbital inclination (rad)
   const ORBIT_PERIOD = 120;                       // Period in seconds (visual)
@@ -248,7 +248,7 @@ export function EarthGlobe() {
 
       {/* ——— 6. Moon (travels along Keplerian orbit) ——— */}
       <mesh ref={moonRef}>
-        <sphereGeometry args={[R * 0.18, 32, 32]} />
+        <sphereGeometry args={[R * 0.2, 32, 32]} />
         <meshStandardMaterial
           map={moonTex}
           roughness={0.45}

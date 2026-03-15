@@ -21,15 +21,16 @@ import { WhalePulse }       from "./WhalePulse";
 import { ImpactBurst }      from "./ImpactBurst";
 import { SomniaHub }        from "./SomniaHub";
 import { HubRipple }        from "./HubRipple";
+import { NodePulse }        from "./NodePulse"; // NEW
 import { HUB_LAT, HUB_LNG } from "./SomniaHub";
 import { useGlobeTxFeed }   from "@/hooks/useGlobeTxFeed";
 
 export function GlobeScene() {
   const {
-    pings, arcs, bursts, pulses, ripples,
+    pings, arcs, bursts, pulses, ripples, nodePulses,
     hubFlash, tps,
     removePing, onArcLanded,
-    removeBurst, removePulse, removeRipple,
+    removeBurst, removePulse, removeRipple, removeNodePulse,
   } = useGlobeTxFeed();
 
   return (
@@ -73,6 +74,28 @@ export function GlobeScene() {
           />
         ))}
 
+        {/* ——— Phase 2: Mempool Gossip Protocol Pulses ——— */}
+        {nodePulses.map((np) => (
+          <NodePulse
+            key={np.id}
+            lat={np.lat}
+            lng={np.lng}
+            color={np.color}
+            onDone={() => removeNodePulse(np.id)}
+          />
+        ))}
+
+        {/* ——— Phase 2: Mempool Gossip Protocol Pulses ——— */}
+        {nodePulses.map((np) => (
+          <NodePulse
+            key={np.id}
+            lat={np.lat}
+            lng={np.lng}
+            color={np.color}
+            onDone={() => removeNodePulse(np.id)}
+          />
+        ))}
+
         {/* ——— Laser Arcs — TX flights to/from hub ——— */}
         {arcs.map((a) => {
           const isWhale = a.color === "#f59e0b" && a.intensity >= 1.0;
@@ -86,7 +109,7 @@ export function GlobeScene() {
               color={a.color}
               speed={a.speed}
               intensity={a.intensity}
-              onDone={() => onArcLanded(a.id, isWhale)}
+              onDone={() => onArcLanded(a.id, isWhale, a.isHubBound)}
             />
           );
         })}
@@ -122,7 +145,7 @@ export function GlobeScene() {
         autoRotate
         autoRotateSpeed={0.2}
         minDistance={80}
-        maxDistance={350}
+        maxDistance={500}
       />
     </Canvas>
   );
