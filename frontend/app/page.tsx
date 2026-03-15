@@ -6,21 +6,13 @@
 // Redesigned with premium Glassmorphism & Cyberpunk aesthetics.
 // ============================================================
 
-import dynamic from "next/dynamic";
-import { Navbar } from "@/components/layout/Navbar";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { useBlockStream } from "@/hooks/useBlockStream";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { useNetworkStats } from "@/hooks/useNetworkStats";
 import { useTpsStore } from "@/hooks/useTpsStore";
 import { useState, useEffect, useRef } from "react";
 import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
-
-      {/* ——— Main 3D Environment Overlay Placeholder (Rendered in layout.tsx) ——— */}
-      <main className="absolute inset-0 z-0 pointer-events-none">
-        {/* Cinematic Vignette Overlay */}
-        <div className="absolute inset-0 vignette pointer-events-none z-0" />
-      </main>
 
 // ——— Premium HUD Stat Card (Corner Bracket Style with Standby Telemetry) ———
 function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
@@ -184,14 +176,14 @@ export default function DashboardPage() {
   const visualTps = useTpsStore((state) => state.visualTps);
 
   return (
-    <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
 
       {/* Corner Accents (screen edges) */}
       <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 z-30 pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 z-30 pointer-events-none" />
 
       {/* ——— Vertical Telemetry (Left Edge) ——— */}
-      <div className="absolute top-36 left-8 flex flex-col z-20 pointer-events-none opacity-50" style={{ gap: "56px" }}>
+      <div className="absolute top-36 left-8 flex flex-col z-30 pointer-events-none opacity-50" style={{ gap: "56px" }}>
         <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
           <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
           <div className="flex items-center gap-2">
@@ -209,15 +201,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ——— Main Environment Overlay (Full Screen) ——— */}
-      <main className="absolute inset-0 z-0">
-        <div className="w-full h-full mix-blend-screen pointer-events-none" />
-        {/* Cinematic Vignette Overlay */}
-        <div className="absolute inset-0 vignette pointer-events-none z-0" />
-      </main>
-
       {/* ——— Foreground UI Elements ——— */}
-      <div className="absolute inset-0 z-10 pointer-events-none">
+      <div className="absolute inset-0 z-30 pointer-events-none">
 
         {/* HUD Stats Cards (Bottom Left) */}
         <div
