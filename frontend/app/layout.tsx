@@ -4,6 +4,7 @@ import { Web3Provider } from "@/lib/providers/Web3Provider";
 import { Navbar } from "@/components/layout/Navbar";
 import { SidebarWrapper } from "@/components/layout/SidebarWrapper";
 import { GlobeSceneWrapper } from "@/components/globe/GlobeSceneWrapper";
+import { GlobalBlockStream } from "@/components/providers/GlobalBlockStream";
 import "./globals.css";
 
 const orbitron = Orbitron({
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" className={`${orbitron.variable} ${shareTechMono.variable} antialiased bg-[#010204] text-white`}>
       <body>
         <Web3Provider>
+          <GlobalBlockStream />
           {/* ——— Global Persistent 3D Background ——— */}
           <div className="fixed inset-0 z-0">
             <div className="w-full h-full mix-blend-screen pointer-events-none">

@@ -10,7 +10,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useBlockStream } from "@/hooks/useBlockStream";
+import { useTpsStore } from "@/hooks/useTpsStore";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { hashToLatLng } from "@/lib/utils/geo";
 import { HUB_LAT, HUB_LNG } from "@/components/globe/SomniaHub";
@@ -61,7 +61,8 @@ export function useGlobeTxFeed() {
   const [ripples, setRipples] = useState<ActiveRipple[]>([]);
   const [hubFlash, setHubFlash] = useState(false);
 
-  const { latestBlock, tps } = useBlockStream();
+  const latestBlock = useTpsStore(state => state.latestBlock);
+  const tps = useTpsStore(state => state.chainTps);
   const { latestAlert } = useWhaleAlerts();
   const lastBlockRef = useRef<number | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,25 +109,31 @@ export function useGlobeTxFeed() {
         size: 0.4 + intensity * 0.6,
       });
     });
+    
+    console.log(`[useGlobeTxFeed] Render Block #${latestBlock.number} | TX: ${txCount} | Arrays: Pings=${newPings.length}`);
+
     // Immediately show pings
     setPings(prev => [...prev, ...newPings].slice(-100));
 
+    // Timer tracking for cleanup
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=500ms ===
-    // (Only if not a giant burst to save performance)
     if (!isBurst) {
-      setTimeout(() => {
+      const t1 = setTimeout(() => {
         const newGossip: ActiveNodePulse[] = hashesData.map(data => ({
           id: `gossip-${data.id}`,
           lat: data.from.lat,
           lng: data.from.lng,
-          color: "#4ade80", // Greenish for gossip spread
+          color: "#4ade80",
         }));
         setNodePulses(prev => [...prev, ...newGossip].slice(-50));
       }, 500);
+      timers.push(t1);
     }
 
-    // === PHASE 3 & 4: VALIDATION ARC (Sucked to Hub/Target) T=1000ms ===
-    setTimeout(() => {
+    // === PHASE 3 & 4: VALIDATION ARC T=1000ms ===
+    const t2 = setTimeout(() => {
       const newArcs: ActiveArc[] = hashesData.map(data => {
         const baseSpeed = isBurst ? 0.5 : (0.10 + intensity * 0.06);
         const speedSpread = isBurst ? 0.4 : 0.04;
@@ -145,16 +152,20 @@ export function useGlobeTxFeed() {
         };
       });
 
-      setArcs(prev => [...prev, ...newArcs].slice(-150));
+      setArcs(prev => [...prev, ...newArcs].slice(-300)); // Increased slice to 300 to match renderCount
       
-      // Flash hub when huge blocks arrive (representing massive validation effort)
       if (isBurst || Math.random() < 0.3) {
         setHubFlash(true);
         if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
         flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
       }
     }, 1000);
+    timers.push(t2);
 
+    // Cleanup function to clear all active timers if the block changes rapidly or component unmounts
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [latestBlock]);
 
   // ——— Whale Alert → outbound arc from hub (gold) ———

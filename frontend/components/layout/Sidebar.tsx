@@ -10,7 +10,7 @@
 // 3. No Duplicates: A block is never shown twice simultaneously.
 // ============================================================
 
-import { useBlockStream, ProcessedBlock } from "@/hooks/useBlockStream";
+import { ProcessedBlock } from "@/hooks/useBlockStream";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useTpsStore } from "@/hooks/useTpsStore";
 
@@ -271,7 +271,7 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
 }
 
 export function Sidebar() {
-  const { recentBlocks, tps } = useBlockStream();
+  const recentBlocks = useTpsStore((state) => state.recentBlocks);
 
   // Shared state manager for all slots
   const queueManager = useRef<QueueManager>({
@@ -280,12 +280,6 @@ export function Sidebar() {
     currentlyDisplaying: new Map(),
     totalProcessedHits: 0,
   });
-
-  // Push real on-chain TPS to Zustand store so page.tsx can read it
-  // without needing its own duplicate RPC connection
-  useEffect(() => {
-    useTpsStore.getState().setChainTps(tps);
-  }, [tps]);
 
   // Share the currently displayed TPS visually backwards
   useEffect(() => {
