@@ -16,10 +16,6 @@ import { latLngToXYZ } from "@/lib/utils/geo";
 export const HUB_LAT =   1.3521;
 export const HUB_LNG = 103.8198;
 
-// Shared mutable ref so EarthGlobe can write rotation.y here
-// and SomniaHub can read it every frame
-export const earthRotationRef = { y: 0 };
-
 interface SomniaHubProps {
   tps?: number;
   flash?: boolean;

@@ -36,7 +36,7 @@ export interface ActiveArc {
   id: string;
   fromLat: number; fromLng: number;
   toLat: number; toLng: number;
-  color: string; speed: number; intensity: number;
+  color: string; endColor?: string; speed: number; intensity: number;
   isWhale?: boolean;
   isHubBound?: boolean;
   isRelay?: boolean;
@@ -145,20 +145,18 @@ export function useGlobeTxFeed() {
     // Immediately show pings
     setPings(prev => [...prev, ...newPings].slice(-100));
 
-    // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=500ms ===
+    // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=0ms ===
     if (!isBurst) {
-      const t1 = setTimeout(() => {
-        const newGossip: ActiveNodePulse[] = hashesData.map(data => ({
-          id: `gossip-${data.id}`,
-          lat: data.from.lat,
-          lng: data.from.lng,
-          color: "#4ade80",
-        }));
-        setNodePulses(prev => [...prev, ...newGossip].slice(-50));
-      }, 500);
+      const newGossip: ActiveNodePulse[] = hashesData.map(data => ({
+        id: `gossip-${data.id}`,
+        lat: data.from.lat,
+        lng: data.from.lng,
+        color: "#4ade80",
+      }));
+      setNodePulses(prev => [...prev, ...newGossip].slice(-50));
     }
 
-    // === PHASE 3 & 4: VALIDATION ARC T=1000ms ===
+    // === PHASE 3 & 4: VALIDATION ARC T=150ms ===
     const t2 = setTimeout(() => {
       const newArcs: ActiveArc[] = [];
       const relayArcs: ActiveArc[] = [];
@@ -175,7 +173,8 @@ export function useGlobeTxFeed() {
           fromLng: data.from.lng,
           toLat: data.nearestNode.lat,
           toLng: data.nearestNode.lng,
-          color,
+          color, // Terminal feed color
+          endColor: "#818cf8", // Beautiful sci-fi Indigo gradient explicitly for the Regional Node
           speed: arcSpeed,
           intensity,
           isHubBound: false,
@@ -188,28 +187,29 @@ export function useGlobeTxFeed() {
           fromLng: data.nearestNode.lng,
           toLat: HUB_LAT,
           toLng: HUB_LNG,
-          color: "#a855f7", // Relay uses hub colors
-          speed: arcSpeed * 1.5, // Resync travels faster on the backbone
+          color: "#ec4899", // Neon Pink distinct start color
+          endColor: "#f59e0b", // Gold/Orange Hub distinct end color
+          speed: arcSpeed * 2.5, // Resync travels much faster on the backbone
           intensity: intensity * 0.5,
           isHubBound: true,
           isRelay: true,
         });
       });
 
-      // Show Origin -> Validator immediately
+      // Show Origin -> Validator immediately (T=150ms)
       setArcs(prev => [...prev, ...newArcs].slice(-300));
       
       // Delay the Validator -> Hub relay slightly so it looks like it bounces off the regional node
       const tRelay = setTimeout(() => {
         setArcs(prev => [...prev, ...relayArcs].slice(-300));
-      }, 800);
+      }, 350);
       
       if (isBurst || Math.random() < 0.3) {
         setHubFlash(true);
         if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
         flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
       }
-    }, 1000);
+    }, 150);
 
     // Immediately shift the queue so the next block can be processed on the next render
     shiftGlobeBlock();

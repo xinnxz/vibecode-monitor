@@ -24,14 +24,14 @@ import { SomniaHub }        from "./SomniaHub";
 import { ValidatorNodes }   from "./ValidatorNodes"; // NEW
 import { HubRipple }        from "./HubRipple";
 import { NodePulse }        from "./NodePulse";
-import { HUB_LAT, HUB_LNG, earthRotationRef } from "./SomniaHub";
+import { HUB_LAT, HUB_LNG } from "./SomniaHub";
 import { useGlobeTxFeed }   from "@/hooks/useGlobeTxFeed";
 
-function RotatingGroup({ children }: { children: React.ReactNode }) {
+function SpinningContainer({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null!);
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (ref.current) {
-      ref.current.rotation.y = earthRotationRef.y;
+      ref.current.rotation.y += delta * 0.04;
     }
   });
   return <group ref={ref}>{children}</group>;
@@ -60,10 +60,10 @@ export function GlobeScene() {
       <Suspense fallback={null}>
         {/* ——— Environment ——— */}
         <SpaceEnvironment />
-        <EarthGlobe />
+        {/* ——— ALL GEOGRAPHIC ACTIVITY WRAPPED TO TRACK EXACT SAME ROTATION ——— */}
+        <SpinningContainer>
+          <EarthGlobe />
 
-        {/* ——— ALL GEOGRAPHIC ACTIVITY WRAPPED TO TRACK EARTH ROTATION ——— */}
-        <RotatingGroup>
           {/* ——— Constellation Web — 5 Regional Validators ——— */}
           <ValidatorNodes />
 
@@ -140,7 +140,7 @@ export function GlobeScene() {
               onDone={() => removePulse(p.id)}
             />
           ))}
-        </RotatingGroup>
+        </SpinningContainer>
 
         <Preload all />
       </Suspense>

@@ -120,8 +120,6 @@ function SmartCycleSlot({
         if (q.unseen.length > 0) {
           selectedBlock = q.unseen.shift()!;
         }
-        // 2. IDLE: We no longer play historical blocks to fake activity.
-        // It stays empty if there are no new blocks.
 
         if (selectedBlock) {
           // Track exactly how many txs are animating on screen right now!
@@ -240,7 +238,8 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
   const dTx = useDecodeText(tx, 100, true);
   const dTime = useDecodeText(time, 150, true);
 
-
+  // === 1:1 GLOBE COLOR SYNC ===
+  // (Reverting to static colors as per user request to keep Terminal Feed clean)
   return (
     <a
       href={`https://shannon-explorer.somnia.network/block/${block.number}`}

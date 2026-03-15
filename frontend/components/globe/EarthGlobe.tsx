@@ -17,7 +17,6 @@
 import { useRef, useMemo } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
-import { earthRotationRef } from "./SomniaHub";
 
 const R = 50;
 
@@ -182,12 +181,6 @@ export function EarthGlobe() {
     scanTimeRef.current -= delta * 15;
     if (scanTimeRef.current < -R - 20) scanTimeRef.current = R + 20;
     uniforms.time.value = scanTimeRef.current;
-
-    // Earth rotation
-    if (earthRef.current) {
-      earthRef.current.rotation.y += delta * 0.04;
-      earthRotationRef.y = earthRef.current.rotation.y;
-    }
 
     // Moon: advance along Kepler orbit
     orbitTimeRef.current = (orbitTimeRef.current + delta) % ORBIT_PERIOD;

@@ -20,17 +20,18 @@ import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
 
 const R = 50;
-const ARC_SEGMENTS = 80;
-const COMET_POINTS = 80;
-const GHOST_DURATION = 15; // seconds path stays visible after comet finishes
+const ARC_SEGMENTS = 32; // Halved for massive performance gains, visual difference is invisible
+const COMET_POINTS = 50; // Halved for WebGL draw speed under high load
+const GHOST_DURATION = 0.5; // VERY SHORT ghost trail (was 15s) so it vanishes immediately
 
 interface FlyArcProps {
   fromLat: number;
   fromLng: number;
-  toLat:   number;
-  toLng:   number;
-  color?:  string;
-  speed?:  number;
+  toLat: number;
+  toLng: number;
+  color?: string;
+  endColor?: string; // New: Enables beautiful sci-fi gradients
+  speed?: number;
   intensity?: number;
   onDone?: () => void;
 }
@@ -71,7 +72,7 @@ function _3Dto2D(start: THREE.Vector3, end: THREE.Vector3) {
 
   return {
     startPoint: sXOY.clone().applyQuaternion(q2),
-    endPoint:   eXOY.clone().applyQuaternion(q2),
+    endPoint: eXOY.clone().applyQuaternion(q2),
     quaternion: q1.clone().invert().multiply(q2.clone().invert()),
   };
 }
@@ -83,9 +84,9 @@ function generateArcPoints(
   segments: number
 ): { points: THREE.Vector3[]; quaternion: THREE.Quaternion } {
   const from3D = latLngToXYZ(fromLat, fromLng, R);
-  const to3D   = latLngToXYZ(toLat, toLng, R);
+  const to3D = latLngToXYZ(toLat, toLng, R);
   const startV = new THREE.Vector3(from3D.x, from3D.y, from3D.z);
-  const endV   = new THREE.Vector3(to3D.x, to3D.y, to3D.z);
+  const endV = new THREE.Vector3(to3D.x, to3D.y, to3D.z);
 
   const { startPoint, endPoint, quaternion } = _3Dto2D(startV, endV);
 
@@ -93,8 +94,9 @@ function generateArcPoints(
   const midV = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
   const dir = midV.clone().normalize();
   const earthAngle = radianAOB(startPoint, endPoint, new THREE.Vector3(0, 0, 0));
-  // Increase height multiplier for MORE dramatic arcs
-  const arcTopCoord = dir.multiplyScalar(R + earthAngle * R * 0.2);
+  // Added a flat +0.8 base height so short-distance hops don't scrape the ground
+  // Added a subtle +0.08 multiplier so it arcs elegantly
+  const arcTopCoord = dir.multiplyScalar(R + 0.8 + earthAngle * R * 0.08);
 
   const center = threePointCenter(startPoint, endPoint, arcTopCoord);
   const arcR = Math.abs(center.y - arcTopCoord.y);
@@ -124,7 +126,8 @@ export function FlyArc({
   fromLat, fromLng,
   toLat, toLng,
   color = "#22d3ee",
-  speed = 0.15,
+  endColor,
+  speed = 0.4, // Increased default speed significantly
   intensity = 0.5,
   onDone,
 }: FlyArcProps) {
@@ -156,22 +159,33 @@ export function FlyArc({
   // ——— Layer 1: Static path line ———
   const pathLine = useMemo(() => {
     const positions = new Float32Array(arcPoints.length * 3);
+    const colors = new Float32Array(arcPoints.length * 3);
+    const colStart = new THREE.Color(color);
+    const colEnd = new THREE.Color(endColor || color);
+
     arcPoints.forEach((v, i) => {
       positions[i * 3] = v.x;
       positions[i * 3 + 1] = v.y;
       positions[i * 3 + 2] = v.z;
+
+      const factor = i / Math.max(1, arcPoints.length - 1);
+      const c = colStart.clone().lerp(colEnd, factor);
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     const mat = new THREE.LineBasicMaterial({
-      color,
+      vertexColors: true,     // Enables the gradient logic
       transparent: true,
       opacity: 0.55 + intensity * 0.25,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
     return { line: new THREE.Line(geo, mat), geo, mat };
-  }, [arcPoints, color, intensity]);
+  }, [arcPoints, color, endColor, intensity]);
 
   // ——— Layer 2: Comet particles ———
   const comet = useMemo(() => {
@@ -179,12 +193,21 @@ export function FlyArc({
     const percents = new Float32Array(COMET_POINTS);
     const colors = new Float32Array(COMET_POINTS * 3);
 
-    const col1 = new THREE.Color(color).multiplyScalar(0.5);
-    const col2 = new THREE.Color(color);
+    const colStart = new THREE.Color(color);
+    const colEnd = new THREE.Color(endColor || color);
 
     for (let i = 0; i < COMET_POINTS; i++) {
       percents[i] = i / COMET_POINTS;
-      const c = col1.clone().lerp(col2, i / COMET_POINTS);
+
+      const factor = i / Math.max(1, COMET_POINTS - 1);
+      const c = colStart.clone().lerp(colEnd, factor);
+
+      // Prevents 100% white blowout with additive blending.
+      // Keeps the head bright, but the tail dims gracefully.
+      // Reduced the scalar massively so that 100 overlapping points don't sum to pure white.
+      const alpha = (0.05 + 0.25 * factor) * (1.1 - intensity * 0.2);
+      c.multiplyScalar(alpha);
+
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -196,9 +219,9 @@ export function FlyArc({
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 2.8 + intensity * 1.5,
+      size: 0.8 + intensity * 0.4, // Massively reduced from 2.8+ to prevent fat white arrows
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.85,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       vertexColors: true,

@@ -184,9 +184,9 @@ export default function DashboardPage() {
     const mockBlock: ProcessedBlock = {
       number: 999000000 + Math.floor(Math.random() * 1000), // Fake high block number
       hash: "0x" + Math.random().toString(16).slice(2, 40) + "mock",
-      txCount: Math.floor(Math.random() * 150) + 15, // Generate 15-165 TXs
+      txCount: Math.floor(Math.random() * 20) + 1, // Generate 1-20 TXs to test all 3 colors
       timestamp: Date.now(),
-      gasUsed: 0n,
+      gasUsed: BigInt(0),
       transactions: Array.from({ length: 5 }, () => "0x" + Math.random().toString(16).slice(2, 40)),
     };
     

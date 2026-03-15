@@ -41,28 +41,28 @@ export function NodePulse({ lat, lng, color = "#4ade80", onDone }: NodePulseProp
 
     if (meshRef.current && matRef.current) {
       // Scale expands outward (like a radar ping)
-      const s = 1 + progress.current * 4.0; 
+      const s = 1 + progress.current * 4.0;
       meshRef.current.scale.set(s, s, s);
-      
+
       // Opacity peaks quickly, then fades out slowly
-      const opacity = progress.current < 0.2 
-        ? progress.current * 5 
+      const opacity = progress.current < 0.2
+        ? progress.current * 5
         : 1 - (progress.current - 0.2) / 0.8;
-        
+
       matRef.current.opacity = opacity * 0.6; // Max opacity 0.6
     }
   });
 
   return (
-    <mesh 
-      ref={meshRef} 
+    <mesh
+      ref={meshRef}
       position={[pos.x, pos.y, pos.z]}
       onUpdate={(self) => {
         // Orient the pulse flat against the globe
         self.lookAt(0, 0, 0);
       }}
     >
-      <ringGeometry args={[0.8, 1.0, 32]} />
+      <ringGeometry args={[0.8, 1.0, 24]} />
       <meshBasicMaterial
         ref={matRef}
         color={color}
