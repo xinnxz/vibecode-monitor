@@ -10,7 +10,7 @@
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { useNetworkStats } from "@/hooks/useNetworkStats";
 import { useTpsStore } from "@/hooks/useTpsStore";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
 
@@ -29,6 +29,9 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
 }) {
   const isIdle = value === 0 || value === "0" || value === "—";
   const isTps = label.toUpperCase().includes("TPS") || label.toUpperCase().includes("ACTIVE TX");
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [glitchKey, setGlitchKey] = useState(0);
 
   // --- Rolling sparkline history ---
   // Stores normalized bar heights (0-1). Shifts left on each tick.
@@ -56,10 +59,10 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
 
         return [...prev.slice(1), newBar];
       });
-    }, 600); // Sample every 600ms = ~1.6 bars/sec, smooth visual rhythm
+    }, isHovered ? 150 : 600); // Much faster tick when hovered for dramatic wave
 
     return () => clearInterval(interval);
-  }, [value, isIdle]);
+  }, [value, isIdle, isHovered]);
 
   // Specific TV Glitch effect ONLY for Live TPS card
   const [tpsGlitch, setTpsGlitch] = useState(false);
@@ -73,19 +76,60 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
     return () => clearInterval(interval);
   }, [isTps]);
 
+  // Hover handlers
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    setGlitchKey(prev => prev + 1);
+  }, []);
+  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
+
   const displayValue = value;
 
   return (
     <motion.div
       layout
-      className="relative min-w-[160px] group cursor-default pointer-events-auto overflow-hidden"
+      className="relative min-w-[160px] group cursor-default pointer-events-auto"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={{
+        overflow: "visible",
         background: isIdle
           ? "linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0.1), transparent)"
           : "linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.15), transparent)",
       }}
     >
-      {/* Background Pulse Animation for Idle state */}
+      {/* \u2014\u2014\u2014 TRON ENERGY BORDER (Neon Racing Light) \u2014\u2014\u2014 */}
+      <div
+        style={{
+          position: "absolute",
+          inset: "-1px",
+          background: isHovered
+            ? `conic-gradient(from var(--tron-angle, 0deg), transparent 50%, ${borderColor} 78%, transparent 100%)`
+            : "transparent",
+          WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          padding: "2px",
+          animation: isHovered ? "tron-spin 1.5s linear infinite" : "none",
+          opacity: isHovered ? 1 : 0,
+          transition: "opacity 0.3s ease",
+          pointerEvents: "none",
+          zIndex: 20,
+        }}
+      />
+
+      {/* Hover glow backdrop */}
+      <div
+        style={{
+          position: "absolute", inset: 0,
+          background: borderColor,
+          opacity: isHovered ? 0.06 : 0,
+          transition: "opacity 0.3s ease",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Background Pulse for Idle */}
       {isIdle && (
         <motion.div
           animate={{ opacity: [0, 0.05, 0] }}
@@ -121,17 +165,34 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
       {/* Content wrapper */}
       <div
         className="relative z-10 flex flex-col items-start text-left"
-        style={{ padding: "14px 24px 18px 18px" }}
+        style={{ padding: "14px 24px 20px 18px" }}
       >
-        <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
+        <p
+          className="text-[9px] font-mono uppercase tracking-widest"
+          style={{
+            color: isHovered ? borderColor : "rgba(255,255,255,0.5)",
+            transition: "color 0.3s",
+            textShadow: isHovered ? `0 0 8px ${borderColor}40` : "none",
+          }}
+        >
+          {label}
+        </p>
 
         <div className="flex items-baseline gap-2 mt-1">
           <motion.p
-            key={String(value)}
+            key={`${String(value)}-${glitchKey}`}
             initial={{ opacity: 0, x: -5 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`text-xl font-bold font-display tracking-wider ${isIdle && !tpsGlitch ? "text-white/80" : colorClass} ${tpsGlitch ? "tv-glitch" : ""}`}
+            className={`text-xl font-bold font-display tracking-wider relative inline-block
+              ${isIdle && !tpsGlitch ? "text-white/80" : colorClass}
+              ${tpsGlitch ? "tv-glitch" : ""}
+              ${isHovered && !tpsGlitch ? "stat-glitch-active" : ""}
+            `}
             data-text={displayValue}
+            style={{
+              textShadow: isHovered ? `0 0 12px ${borderColor}80, 0 0 24px ${borderColor}30` : "none",
+              transition: "text-shadow 0.3s",
+            }}
           >
             {displayValue}
           </motion.p>
@@ -142,7 +203,17 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
           )}
         </div>
 
-        {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-1 uppercase">{sub}</p>}
+        {sub && (
+          <p
+            className="text-[9px] font-mono tracking-wider mt-1 uppercase"
+            style={{
+              color: isHovered ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)",
+              transition: "color 0.3s",
+            }}
+          >
+            {sub}
+          </p>
+        )}
 
         {/* ——— ALWAYS-ON REACTIVE SPARKLINE ——— */}
         <div
@@ -235,6 +306,7 @@ export default function DashboardPage() {
 
   return (
     <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
+
 
       {/* Corner Accents (screen edges) */}
       <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 z-30 pointer-events-none" />

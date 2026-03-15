@@ -4,16 +4,18 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
 import { HUB_LAT, HUB_LNG } from "./SomniaHub";
+import { NodeLabel } from "./NodeLabel";
 
 const R = 50;
 
-// Coordinates for the 5 Regional Validators
+// Coordinates for the 6 Regional Validators
 export const VALIDATORS = [
-  { id: "nyc", lat: 40.7128, lng: -74.0060, color: 0x3b82f6 }, // Blue (NYC)
-  { id: "fra", lat: 50.1109, lng: 8.6821, color: 0x10b981 }, // Green (Frankfurt)
-  { id: "nrt", lat: 35.6762, lng: 139.6503, color: 0xf59e0b }, // Orange (Tokyo)
-  { id: "sp", lat: -23.5505, lng: -46.6333, color: 0xef4444 }, // Red (São Paulo)
-  { id: "dxb", lat: 25.2048, lng: 55.2708, color: 0x06b6d4 }  // Cyan (Dubai)
+  { id: "nyc", name: "NEW YORK",  region: "NA-EAST",       lat: 40.7128,  lng: -74.0060,  color: 0x3b82f6, hex: "#3b82f6" },
+  { id: "fra", name: "FRANKFURT", region: "EU-WEST",       lat: 50.1109,  lng: 8.6821,    color: 0x10b981, hex: "#10b981" },
+  { id: "nrt", name: "TOKYO",     region: "AP-NORTHEAST",  lat: 35.6762,  lng: 139.6503,  color: 0xf59e0b, hex: "#f59e0b" },
+  { id: "sp",  name: "SÃO PAULO", region: "SA-EAST",       lat: -23.5505, lng: -46.6333,  color: 0xec4899, hex: "#ec4899" },
+  { id: "dxb", name: "DUBAI",     region: "ME-CENTRAL",    lat: 25.2048,  lng: 55.2708,   color: 0x06b6d4, hex: "#06b6d4" },
+  { id: "jkt", name: "JAKARTA",   region: "AP-SOUTHEAST",  lat: -6.2088,  lng: 106.8456,  color: 0xef4444, hex: "#ef4444" },
 ];
 
 // Helper to draw a curved static line between two vectors
@@ -58,6 +60,7 @@ export function ValidatorNodes() {
     const nrt = nodePositions[2];
     const sp = nodePositions[3];
     const dxb = nodePositions[4];
+    const jkt = nodePositions[5];
     const hub = hubPos;
 
     // Pairs of connections to form the web loop
@@ -68,6 +71,7 @@ export function ValidatorNodes() {
       [hub, nrt], // Singapore to Tokyo
       [nrt, nyc], // cross-pacific Tokyo -> NYC
       [sp, nyc],  // South Am to North Am
+      [jkt, hub], // Jakarta to Hub (Singapore)
     ];
 
     return pairs.map(pair => getCurvePositions(pair[0], pair[1]));
@@ -94,7 +98,7 @@ export function ValidatorNodes() {
         </group>
       ))}
 
-      {/* 2. Draw the 5 Validator Nodes */}
+      {/* 2. Draw the 6 Validator Nodes + Labels */}
       {VALIDATORS.map((v, i) => {
         const pos = nodePositions[i];
         return (
@@ -108,6 +112,8 @@ export function ValidatorNodes() {
               <sphereGeometry args={[1, 24, 24]} />
               <meshBasicMaterial color={v.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
+            {/* Cyberpunk HUD Label */}
+            <NodeLabel name={v.name} region={v.region} color={v.hex} />
           </group>
         );
       })}

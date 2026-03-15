@@ -11,6 +11,7 @@ import { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
+import { NodeLabel } from "./NodeLabel";
 
 // Singapore — geographic anchor
 export const HUB_LAT =   1.3521;
@@ -130,6 +131,9 @@ export function SomniaHub({ tps = 0, flash = false }: SomniaHubProps) {
             blending={THREE.AdditiveBlending}
           />
         </mesh>
+
+        {/* Cyberpunk HUD Label — SOMNIA HQ */}
+        <NodeLabel name="SOMNIA HQ" region="CORE-NEXUS" color="#a855f7" isHub offsetY={6} />
       </group>
     </group>
   );
