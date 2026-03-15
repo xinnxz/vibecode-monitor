@@ -56,10 +56,7 @@ export function Navbar() {
       {/* ——— LEFT: Logo Brand & Live HUD ——— */}
       <div className="flex flex-col gap-6 pointer-events-auto">
         <Link href="/">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="flex items-center gap-4"
-          >
+          <div className="flex items-center gap-4">
             {/* User Custom Logo */}
             <div className="flex items-center" style={{ marginLeft: "28px", marginTop: "12px" }}>
               <Image
@@ -71,32 +68,32 @@ export function Navbar() {
                 priority
               />
             </div>
-          </motion.div>
+          </div>
         </Link>
       </div>
 
       {/* ——— RIGHT: Navigation & Wallet ——— */}
-      <div className="pointer-events-auto flex items-center gap-12 font-display">
+      <div className="pointer-events-auto flex items-center gap-12">
 
         {/* Nav Links (Mass Effect Style - Top Red Line Active) */}
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-12">
           {NAV_LINKS.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative px-2 py-4 text-[13px] tracking-widest uppercase transition-colors ${isActive ? "text-white font-bold" : "text-white/50 hover:text-white/80"
+                className={`relative px-2 py-4 text-[15px] transition-colors font-sans ${isActive ? "text-white font-medium" : "text-white/60 hover:text-white"
                   }`}
               >
                 {isActive && (
                   <motion.div
                     layoutId="active-nav-top"
-                    className="absolute top-0 left-0 right-0 h-[2px] bg-red-600 shadow-[0_0_10px_#dc2626]"
+                    className="absolute top-0 left-0 right-0 h-[3px] bg-[#9D00FF] shadow-[0_0_12px_#9D00FF]"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
-                {item.label}
+                <span className="capitalize">{item.label}</span>
               </Link>
             );
           })}

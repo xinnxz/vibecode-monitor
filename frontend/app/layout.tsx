@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Rajdhani, Share_Tech_Mono } from "next/font/google";
+import { Orbitron, Share_Tech_Mono } from "next/font/google";
 import { Web3Provider } from "@/lib/providers/Web3Provider";
 import "./globals.css";
 
-const rajdhani = Rajdhani({
+const orbitron = Orbitron({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700', '900'],
   variable: '--font-display',
 });
 
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${rajdhani.variable} ${shareTechMono.variable} antialiased bg-black text-white`}>
+    <html lang="en" className={`${orbitron.variable} ${shareTechMono.variable} antialiased bg-black text-white`}>
       <body>
         {/* Web3Provider membungkus semua halaman agar bisa akses wallet + contract */}
         <Web3Provider>
