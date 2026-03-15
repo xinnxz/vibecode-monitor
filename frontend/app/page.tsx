@@ -7,7 +7,7 @@
 // ============================================================
 
 import dynamic from "next/dynamic";
-import { Navbar }  from "@/components/layout/Navbar";
+import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useBlockStream } from "@/hooks/useBlockStream";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
@@ -42,24 +42,24 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", bgAccent = 
   return (
     <motion.div
       layout
-      className="relative glass rounded-2xl px-6 py-5 min-w-[140px] overflow-hidden group hover:bg-white/[0.02] transition-colors"
+      className="relative glass rounded-2xl px-6 py-4 flex flex-col justify-center items-center text-center min-w-[140px] overflow-hidden group hover:bg-white/[0.02] transition-colors"
     >
-      {/* Decorative top thick border glow */}
-      <div className={`absolute top-0 left-0 right-0 h-[2px] opacity-70 ${bgAccent} shadow-[0_0_12px_currentColor]`} />
-      
       {/* Soft background radial glow */}
       <div className={`absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-10 blur-2xl pointer-events-none ${bgAccent}`} />
 
-      <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest mb-1.5">{label}</p>
-      <motion.p
-        key={String(value)}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className={`text-2xl font-bold font-mono tracking-tight ${colorClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]`}
-      >
-        {value}
-      </motion.p>
-      {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-1 uppercase">{sub}</p>}
+      {/* Centered Content Wrapper */}
+      <div className="relative z-10 w-full flex flex-col items-center">
+        <p className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1">{label}</p>
+        <motion.p
+          key={String(value)}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`text-2xl font-bold font-mono tracking-tight ${colorClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]`}
+        >
+          {value}
+        </motion.p>
+        {sub && <p className="text-[10px] text-white/30 font-mono tracking-wider mt-0.5 uppercase">{sub}</p>}
+      </div>
     </motion.div>
   );
 }
@@ -75,7 +75,7 @@ function WhaleTicker() {
       {/* Label Kiri */}
       <div className="shrink-0 px-4 border-r border-red-500/30 h-full flex items-center bg-red-500/5">
         <span className="text-red-400 text-[10px] font-mono font-bold tracking-widest animate-pulse drop-shadow-[0_0_5px_#ef4444]">
-           WHALE RADAR
+          WHALE RADAR
         </span>
       </div>
 
@@ -83,7 +83,7 @@ function WhaleTicker() {
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-red-950/40 to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-red-950/40 to-transparent z-10 pointer-events-none" />
-        
+
         <div className="ticker-scroll flex gap-12 text-[11px] font-mono text-red-300/80 tracking-wide items-center h-full">
           {[...alerts, ...alerts].map((a, i) => (
             <span key={i} className="shrink-0 flex items-center gap-2">
@@ -114,7 +114,7 @@ export default function DashboardPage() {
 
       {/* ——— Main 3D Environment ——— */}
       <main className="absolute inset-0">
-        
+
         <div className="w-full h-full mix-blend-screen">
           <GlobeScene />
         </div>
@@ -123,33 +123,33 @@ export default function DashboardPage() {
         <div className="absolute inset-0 vignette pointer-events-none z-0" />
 
         {/* ——— HUD Stats Cards (Bottom Left) ——— */}
-        <div className="absolute bottom-16 left-6 flex flex-wrap gap-4 z-10 pointer-events-auto">
+        <div className="absolute bottom-4 left-4 flex flex-wrap gap-4 z-10 pointer-events-auto">
           <StatCard
             label="Total TX"
             value={formatCompact(stats.totalTransactions)}
-            sub="all time"
-            colorClass="text-purple-300"
+            sub="All Time"
+            colorClass="text-purple-400"
             bgAccent="bg-purple-500"
           />
           <StatCard
             label="Live TPS"
             value={tps > 0 ? tps : "—"}
-            sub="transactions/sec"
-            colorClass="text-cyan-300"
-            bgAccent="bg-cyan-500"
+            sub="Transactions/Sec"
+            colorClass="text-indigo-400"
+            bgAccent="bg-indigo-500"
           />
           <StatCard
             label="Wallets"
             value={formatCompact(stats.uniqueAddressCount)}
-            sub="unique tracking"
-            colorClass="text-emerald-300"
-            bgAccent="bg-emerald-500"
+            sub="Unique Tracking"
+            colorClass="text-blue-400"
+            bgAccent="bg-blue-600"
           />
           <StatCard
             label="Whales"
             value={whaleAlerts.length}
-            sub="detected anomaly"
-            colorClass="text-red-300"
+            sub="Detected Anomaly"
+            colorClass="text-red-400"
             bgAccent="bg-red-500"
           />
         </div>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
 
       {/* ——— Whale Ticker (Bottom Edge) ——— */}
       <WhaleTicker />
-      
+
     </div>
   );
 }

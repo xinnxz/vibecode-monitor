@@ -5,10 +5,13 @@
 // Tombol connect/disconnect wallet dengan desain floating pill.
 // ============================================================
 
+import { useState, useEffect } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { motion } from "framer-motion";
 
 export function WalletButton() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const {
     shortAddress,
     isConnected,
@@ -19,6 +22,16 @@ export function WalletButton() {
     disconnectWallet,
     switchToSomnia,
   } = useWallet();
+
+  // Prevent SSR Hydration Error by rendering a fallback until mounted on client
+  if (!mounted) {
+    return (
+      <button disabled className="flex items-center gap-2 px-5 py-3 glass-pill text-white/50 text-xs font-mono font-bold cursor-not-allowed">
+        <span className="w-2 h-2 rounded-full bg-white/20 animate-pulse" />
+        Syncing...
+      </button>
+    );
+  }
 
   // ——— State: Menghubungkan ———
   if (isConnecting) {

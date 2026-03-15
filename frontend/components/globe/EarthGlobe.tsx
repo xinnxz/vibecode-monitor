@@ -27,7 +27,7 @@ export function EarthGlobe() {
 
   // ——— GLSL Shader Uniforms ———
   const uniforms = useMemo(() => ({
-    glowColor: { value: new THREE.Color(0x0cd1eb) },
+    glowColor: { value: new THREE.Color(0x4b0082) }, // Dark Purple for base terrain glow
     scale:     { value: -1.0 },
     bias:      { value: 1.0 },
     power:     { value: 3.3 },
@@ -155,9 +155,9 @@ export function EarthGlobe() {
     }
   });
 
-  // Ring colors
-  const ringColors = [0x0c3172, 0x0c3172, 0x0c3172];
-  const ballColors = [0xe0b187, 0x628fbb, 0x806bdf];
+  // Ring colors representing Somnia Theme
+  const ringColors = [0x4b0082, 0x2e0094, 0x4b0082];
+  const ballColors = [0x9d00ff, 0x9d00ff, 0xffffff];
 
   return (
     <group ref={earthRef}>
@@ -165,7 +165,7 @@ export function EarthGlobe() {
       <points>
         <sphereGeometry args={[R + 10, 60, 60]} />
         <pointsMaterial
-          color={0x81ffff}
+          color={0x2e0094} // Indigo Blue for border points
           transparent
           sizeAttenuation
           opacity={0.1}
@@ -190,7 +190,7 @@ export function EarthGlobe() {
           uniforms={{
             coeficient: { value: 1.0 },
             power:      { value: 3 },
-            glowColor:  { value: new THREE.Color(0x4390d1) },
+            glowColor:  { value: new THREE.Color(0x4b0082) }, // Dark Purple for inner atmosphere
           }}
           vertexShader={atmoVertexShader}
           fragmentShader={atmoFragmentShader}
@@ -204,9 +204,9 @@ export function EarthGlobe() {
       <sprite scale={[R * 3.0, R * 3.0, 1]}>
         <spriteMaterial
           map={glowTex}
-          color={0x4390d1}
+          color={0x1a0033} // Very deep, dark indigo for the huge sprite glow
           transparent
-          opacity={0.7}
+          opacity={0.4} // Lowered opacity so it's not washed out
           depthWrite={false}
         />
       </sprite>

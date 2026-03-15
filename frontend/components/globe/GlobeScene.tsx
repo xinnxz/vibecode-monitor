@@ -54,12 +54,12 @@ export function GlobeScene() {
       const to   = hashToLatLng(hash.slice(0, 2) + hash.slice(4));
       const id   = `${ts}-${i}`;
 
-      newPings.push({ id: `p-${id}`, lat: from.lat, lng: from.lng, color: "#22d3ee" });
+      newPings.push({ id: `p-${id}`, lat: from.lat, lng: from.lng, color: "#9d00ff" });
       newArcs.push({
         id: `a-${id}`,
         fromLat: from.lat, fromLng: from.lng,
         toLat: to.lat, toLng: to.lng,
-        color: "#f3ae76",
+        color: "#2e0094",
       });
     });
 

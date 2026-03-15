@@ -16,15 +16,14 @@
   --color-border-glow: rgba(255, 255, 255, 0.15);
 
   /* Neon accents */
-  --color-purple:      #c084fc;
-  --color-purple-dim:  rgba(192, 132, 252, 0.15);
-  --color-cyan:        #22d3ee;
-  --color-cyan-dim:    rgba(34, 211, 238, 0.15);
-  --color-emerald:     #34d399;
-  --color-emerald-dim: rgba(52, 211, 153, 0.15);
-  --color-red:         #fb7185;
-  --color-red-dim:     rgba(251, 113, 133, 0.15);
-  --color-yellow:      #facc15;
+  --color-purple:      #9C00FF; /* Magenta Terang */
+  --color-indigo:      #5E17EB; /* Ungu Indigo */
+  --color-blue:        #2B2DFF; /* Biru Elektrik */
+  --color-deep-purple: #3F0071; /* Ungu Tua */
+  
+  /* Status/Accent Colors (dipertahankan untuk fungsi, tapi disesuaikan saturasinya) */
+  --color-emerald:     #10b981;
+  --color-red:         #ef4444;
   --color-yellow:      #eab308;
 
   /* Typography */
@@ -120,8 +119,10 @@ body {
 .neon-red    { color: var(--color-red);    text-shadow: 0 0 15px rgba(251, 113, 133, 0.9), 0 0 5px rgba(251, 113, 133, 0.5); }
 
 /* ——— Neon border glow ——— */
-.border-glow-purple { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.15); }
-.border-glow-cyan   { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4),  0 0 16px rgba(34, 211, 238, 0.15); }
+/* Menggunakan palet baru */
+.border-glow-purple { box-shadow: 0 0 0 1px rgba(156, 0, 255, 0.4), 0 0 16px rgba(156, 0, 255, 0.2); } /* Magenta #9C00FF */
+.border-glow-indigo { box-shadow: 0 0 0 1px rgba(94, 23, 235, 0.4),  0 0 16px rgba(94, 23, 235, 0.2); } /* Indigo #5E17EB */
+.border-glow-blue   { box-shadow: 0 0 0 1px rgba(43, 45, 255, 0.4), 0 0 16px rgba(43, 45, 255, 0.2); } /* Electric Blue #2B2DFF */
 .border-glow-emerald{ box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4), 0 0 16px rgba(16, 185, 129, 0.15); }
 .border-glow-red    { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),   0 0 16px rgba(239, 68, 68, 0.15); }
 

@@ -39,10 +39,10 @@ function BlockEntry({ block }: { block: ProcessedBlock }) {
         <span className="text-white/30 text-[10px] font-mono">{time}</span>
       </div>
       <div className="flex items-center justify-between pl-3.5">
-        <span className="text-white/50 text-[10px] font-mono tracking-wider truncate max-w-[160px] group-hover:text-cyan-200/70 transition-colors">
+        <span className="text-white/50 text-[10px] font-mono tracking-wider truncate max-w-[160px] group-hover:text-indigo-300 transition-colors">
           {block.hash.slice(0, 18)}...
         </span>
-        <div className="flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-400 text-[9px] font-mono font-bold border border-emerald-500/20">
+        <div className="flex items-center gap-1 bg-indigo-500/20 px-1.5 py-0.5 rounded text-indigo-400 text-[9px] font-mono font-bold border border-indigo-500/30">
           {block.txCount} TX
         </div>
       </div>
@@ -104,7 +104,7 @@ export function Sidebar() {
       {/* Top Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-center gap-2">
-          <span className="text-emerald-400 font-mono text-xs animate-pulse">■</span>
+          <span className="text-purple-400 font-mono text-xs animate-pulse">■</span>
           <span className="text-white/80 text-xs font-bold font-mono uppercase tracking-widest">
             Live Feed
           </span>

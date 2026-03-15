@@ -90,7 +90,7 @@ export function Navbar() {
                 {isActive && (
                   <motion.div
                     layoutId="active-nav"
-                    className="absolute inset-0 bg-white/10 border border-white/20 rounded-full shadow-[inset_0_0_15px_rgba(255,255,255,0.05)]"
+                    className="absolute inset-0 bg-indigo-500/30 border border-purple-500/50 rounded-full shadow-[inset_0_0_15px_rgba(156,0,255,0.2)]"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
