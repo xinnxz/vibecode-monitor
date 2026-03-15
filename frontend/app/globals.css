@@ -21,7 +21,7 @@
   --color-blue:        #2B2DFF; /* Biru Elektrik */
   --color-deep-purple: #3F0071; /* Ungu Tua */
   
-  /* Status/Accent Colors (dipertahankan untuk fungsi, tapi disesuaikan saturasinya) */
+  /* Status/Accent Colors */
   --color-emerald:     #10b981;
   --color-red:         #ef4444;
   --color-yellow:      #eab308;
@@ -34,11 +34,13 @@
   --globe-radius: 1.0;
 }
 
-/* ——— Base Reset ——— */
+/* ——— Base Reset ———
+   NOTE: Tailwind v4's Preflight sudah menangani reset dasar.
+   Kita HANYA menambahkan box-sizing saja.
+   JANGAN menambah margin:0 / padding:0 di sini karena akan
+   menimpa utility class Tailwind (mt-*, px-*, dll). ——— */
 *, *::before, *::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html {
@@ -113,25 +115,24 @@ body {
 }
 
 /* ——— Neon text glow ——— */
-.neon-purple { color: var(--color-purple); text-shadow: 0 0 15px rgba(192, 132, 252, 0.8), 0 0 5px rgba(192, 132, 252, 0.5); }
-.neon-cyan   { color: var(--color-cyan);   text-shadow: 0 0 15px rgba(34, 211, 238, 0.8), 0 0 5px rgba(34, 211, 238, 0.5); }
-.neon-emerald{ color: var(--color-emerald);text-shadow: 0 0 15px rgba(52, 211, 153, 0.8), 0 0 5px rgba(52, 211, 153, 0.5); }
-.neon-red    { color: var(--color-red);    text-shadow: 0 0 15px rgba(251, 113, 133, 0.9), 0 0 5px rgba(251, 113, 133, 0.5); }
+.neon-purple  { color: var(--color-purple);  text-shadow: 0 0 15px rgba(192, 132, 252, 0.8), 0 0 5px rgba(192, 132, 252, 0.5); }
+.neon-cyan    { color: var(--color-cyan);    text-shadow: 0 0 15px rgba(34, 211, 238, 0.8), 0 0 5px rgba(34, 211, 238, 0.5); }
+.neon-emerald { color: var(--color-emerald); text-shadow: 0 0 15px rgba(52, 211, 153, 0.8), 0 0 5px rgba(52, 211, 153, 0.5); }
+.neon-red     { color: var(--color-red);     text-shadow: 0 0 15px rgba(251, 113, 133, 0.9), 0 0 5px rgba(251, 113, 133, 0.5); }
 
 /* ——— Neon border glow ——— */
-/* Menggunakan palet baru */
-.border-glow-purple { box-shadow: 0 0 0 1px rgba(156, 0, 255, 0.4), 0 0 16px rgba(156, 0, 255, 0.2); } /* Magenta #9C00FF */
-.border-glow-indigo { box-shadow: 0 0 0 1px rgba(94, 23, 235, 0.4),  0 0 16px rgba(94, 23, 235, 0.2); } /* Indigo #5E17EB */
-.border-glow-blue   { box-shadow: 0 0 0 1px rgba(43, 45, 255, 0.4), 0 0 16px rgba(43, 45, 255, 0.2); } /* Electric Blue #2B2DFF */
-.border-glow-emerald{ box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4), 0 0 16px rgba(16, 185, 129, 0.15); }
-.border-glow-red    { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),   0 0 16px rgba(239, 68, 68, 0.15); }
+.border-glow-purple  { box-shadow: 0 0 0 1px rgba(156, 0, 255, 0.4), 0 0 16px rgba(156, 0, 255, 0.2); }
+.border-glow-indigo  { box-shadow: 0 0 0 1px rgba(94, 23, 235, 0.4),  0 0 16px rgba(94, 23, 235, 0.2); }
+.border-glow-blue    { box-shadow: 0 0 0 1px rgba(43, 45, 255, 0.4), 0 0 16px rgba(43, 45, 255, 0.2); }
+.border-glow-emerald { box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4), 0 0 16px rgba(16, 185, 129, 0.15); }
+.border-glow-red     { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),  0 0 16px rgba(239, 68, 68, 0.15); }
 
 /* ——— Sci-Fi HUD Ornaments ——— */
 .hud-corner {
   position: absolute;
   width: 16px;
   height: 16px;
-  border-color: rgba(34, 211, 238, 0.5); /* Cyan */
+  border-color: rgba(34, 211, 238, 0.5);
   border-style: solid;
   pointer-events: none;
   z-index: 20;
@@ -141,35 +142,31 @@ body {
 .hud-corner.bl { bottom: 3rem; left: 1rem; border-width: 0 0 2px 2px; }
 .hud-corner.br { bottom: 3rem; right: 1rem; border-width: 0 2px 2px 0; }
 
-/* ——— Animated pulse ring (dipakai di node ping globe) ——— */
+/* ——— Animations ——— */
 @keyframes ring-pulse {
   0%   { transform: scale(1);   opacity: 0.8; }
   100% { transform: scale(2.5); opacity: 0; }
 }
 .ring-pulse { animation: ring-pulse 1.5s ease-out infinite; }
 
-/* ——— Red wave (whale alert) ——— */
 @keyframes whale-wave {
   0%   { transform: scale(0.5); opacity: 1; }
   100% { transform: scale(4);   opacity: 0; }
 }
 .whale-wave { animation: whale-wave 1.2s ease-out forwards; }
 
-/* ——— Ticker scroll bottom bar ——— */
 @keyframes ticker-scroll {
   from { transform: translateX(100%); }
   to   { transform: translateX(-100%); }
 }
 .ticker-scroll { animation: ticker-scroll 30s linear infinite; white-space: nowrap; }
 
-/* ——— HUD number flip (nilai berubah) ——— */
 @keyframes hud-flip {
-  0%  { opacity: 0; transform: translateY(-8px); }
-  100%{ opacity: 1; transform: translateY(0); }
+  0%   { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 .hud-flip { animation: hud-flip 0.25s ease-out; }
 
-/* ——— Loading shimmer ——— */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -180,7 +177,7 @@ body {
   animation: shimmer 1.8s infinite;
 }
 
-/* ——— Vignette overlay (pojok gelap seperti monitor) ——— */
+/* ——— Vignette overlay ——— */
 .vignette {
   background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
   pointer-events: none;
@@ -188,48 +185,4 @@ body {
 
 /* ——— Terminal cursor blink ——— */
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-/* Mass Effect Logo Styling */
-.me-logo-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1;
-}
-
-.me-title {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 2.5rem;
-  letter-spacing: 0.05em;
-  color: white;
-  text-transform: uppercase;
-  position: relative;
-  display: inline-block;
-  line-height: 0.8;
-  text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-}
-
-/* The iconic diagonal slash through the text */
-.me-title::after {
-  content: '';
-  position: absolute;
-  top: 45%;
-  left: -5%;
-  width: 110%;
-  height: 3px;
-  background-color: #010204; /* Hardcut matching the frame background */
-  transform: rotate(-4deg);
-  box-shadow: 0 -1px 2px rgba(255,255,255,0.2); /* Slight highlight on cut edge */
-}
-
-.me-subtitle {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.85em; /* Extremely wide tracking */
-  color: white;
-  text-transform: uppercase;
-  margin-top: 8px;
-  padding-left: 4px;
-}.cursor-blink { animation: blink 1s step-end infinite; }
+.cursor-blink { animation: blink 1s step-end infinite; }

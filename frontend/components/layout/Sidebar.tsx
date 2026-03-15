@@ -112,7 +112,7 @@ export function Sidebar() {
   }, [recentBlocks, whaleAlerts]);
 
   return (
-    <aside className="absolute top-28 right-8 bottom-16 w-80 flex flex-col z-40 pointer-events-none">
+    <aside className="absolute top-24 right-10 bottom-20 w-80 flex flex-col z-40 pointer-events-none">
 
       {/* Top Header removed to match reference (bare cards) OR keep a subtle one */}
       <div className="flex items-center justify-between px-5 py-2 mb-4">

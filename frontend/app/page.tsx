@@ -46,15 +46,11 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", bgAccent = 
     >
       {/* Edge Accent Glow */}
       <div
-        className={`absolute left-0 top-0 bottom-0 ${bgAccent} opacity-80 group-hover:opacity-100 transition-opacity`}
-        style={{ width: '2px' }}
+        className={`absolute left-0 top-0 bottom-0 w-[2px] ${bgAccent} opacity-80 group-hover:opacity-100 transition-opacity`}
       />
 
       {/* Content wrapper */}
-      <div
-        className="relative z-10 flex flex-col items-start text-left py-3"
-        style={{ paddingLeft: '8px', paddingRight: '20px' }}
-      >
+      <div className="relative z-10 flex flex-col items-start text-left py-4 pl-4 pr-6">
         <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
         <motion.p
           key={String(value)}
@@ -119,11 +115,11 @@ export default function DashboardPage() {
       <div className="relative w-full h-full rounded-[2rem] border border-white/10 overflow-hidden bg-black/50 shadow-[0_0_50px_rgba(0,0,0,0.5)_inset,0_0_0_1px_rgba(255,255,255,0.02)]">
 
         {/* Corner Accents */}
-        <div className="absolute top-0 left-0 w-32 h-32 border-t border-l border-red-500/30 rounded-tl-[2rem] z-0 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-32 h-32 border-b border-r border-red-500/30 rounded-br-[2rem] z-0 pointer-events-none" />
+        <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 rounded-tl-[2rem] z-0 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 rounded-br-[2rem] z-0 pointer-events-none" />
 
         {/* ——— Vertical Telemetry (Left Edge) ——— */}
-        <div className="absolute top-32 left-6 flex flex-col gap-12 z-20 pointer-events-none opacity-50">
+        <div className="absolute top-36 left-8 flex flex-col gap-14 z-20 pointer-events-none opacity-50">
           <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
             <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
             <div className="flex items-center gap-2">
@@ -158,7 +154,7 @@ export default function DashboardPage() {
         <div className="absolute inset-0 z-10 pointer-events-none">
 
           {/* HUD Stats Cards (Bottom Left inside frame) */}
-          <div className="absolute bottom-6 left-6 flex flex-wrap gap-4 pointer-events-auto">
+          <div className="absolute bottom-10 left-10 flex flex-wrap gap-6 pointer-events-auto">
             <StatCard
               label="Total TX"
               value={formatCompact(stats.totalTransactions)}
