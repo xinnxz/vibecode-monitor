@@ -36,37 +36,49 @@ export function NodeLabel({
   nodePos,
 }: NodeLabelProps) {
   const containerRef = useRef<HTMLDivElement>(null!);
+  const groupRef = useRef<THREE.Group>(null!);
   const { camera } = useThree();
 
   // We manually calculate occlusion (hiding behind the globe) and scale
   // because <Html occlude distanceFactor> causes massive FPS drops natively.
   useFrame(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !groupRef.current) return;
+
+    // Get the exact world position after all parent group rotations
+    const worldPos = new THREE.Vector3();
+    groupRef.current.getWorldPosition(worldPos);
 
     // 1. Calculate Occlusion (is the node behind the earth from camera view?)
-    // Using exact spherical horizon distance math to prevent fading out when zoomed in closely
-    const R = 50; // Earth globe radius
-    const camDistToCenter = camera.position.length();
-    const horizonDist = Math.sqrt(Math.max(0, camDistToCenter * camDistToCenter - R * R));
-    const distToNode = camera.position.distanceTo(nodePos);
+    // Using a dot product between (camera -> globe center) and (globe center -> node world position)
+    const camDir = camera.position.clone().normalize();
+    const nodeDir = worldPos.clone().normalize();
+    const dotProduct = camDir.dot(nodeDir);
 
-    // Smooth fade around the horizon edge
-    const visibilityMargin = 2.0;
+    // Fade out smoothly as it rounds the horizon edge
+    // Because this is a perspective camera, the true horizon is NOT at dotProduct = 0 (90 degrees).
+    // The horizon angle depends on the camera distance: cos(theta) = R / D.
+    const R = 50; 
+    const camDist = camera.position.length();
+    const horizonDot = camDist > R ? R / camDist : 0; // The exact edge of visibility
+    
     let targetOpacity = 0;
-    if (distToNode < horizonDist - visibilityMargin) {
-      targetOpacity = 1; // Fully visible on the front face
-    } else if (distToNode < horizonDist + visibilityMargin) {
-      // Fade out smoothly over the margin
-      targetOpacity = 1 - (distToNode - (horizonDist - visibilityMargin)) / (visibilityMargin * 2);
+    const fadeStart = horizonDot + 0.15; // Starts fading slightly before the edge
+    const fadeEnd = horizonDot - 0.05;   // Fully invisible just past the visual edge
+
+    if (dotProduct > fadeStart) {
+      targetOpacity = 1; // Front and center
+    } else if (dotProduct > fadeEnd) {
+      // Smoothly transition from 1 to 0
+      targetOpacity = Math.max(0, (dotProduct - fadeEnd) / (fadeStart - fadeEnd));
     }
 
     // 2. Calculate Distance Scale
     // How far is the camera?
-    const dist = camera.position.distanceTo(nodePos);
+    const dist = camera.position.distanceTo(worldPos);
     
     // As `dist` gets larger (zoomed out), we want `targetScale` to get smaller.
     // Base scale is smaller now so they don't dominate the screen.
-    const baseScale = isHub ? 0.65 : 0.5;
+    const baseScale = isHub ? 0.60 : 0.42;
     
     // 120 is an arbitrary tuning distance where scale = baseScale.
     // If distance > 120 (zoomed out), scale < baseScale.
@@ -104,7 +116,8 @@ export function NodeLabel({
   const svgHeight = dy + 4;
 
   return (
-    <Html
+    <group ref={groupRef}>
+      <Html
       // Position exactly at the center of the node sphere!
       position={[0, 0, 0]}
       center={false}
@@ -248,5 +261,6 @@ export function NodeLabel({
         </div>
       </div>
     </Html>
+  </group>
   );
 }

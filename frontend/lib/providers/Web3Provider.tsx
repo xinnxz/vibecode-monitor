@@ -6,6 +6,7 @@
 // ============================================================
 "use client";
 
+import { useState } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { metaMask } from "wagmi/connectors";
@@ -22,17 +23,17 @@ const config = createConfig({
   },
 });
 
-// QueryClient untuk data fetching dan caching on-chain data
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 5, // Data dianggap stale setelah 5 detik
-      refetchInterval: 1000 * 3, // Auto-refetch setiap 3 detik
-    },
-  },
-});
-
 export function Web3Provider({ children }: { children: React.ReactNode }) {
+  // Store QueryClient in state to avoid React Hydration mismatch / CSR state bleeding
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 5, // Data dianggap stale setelah 5 detik
+        refetchInterval: 1000 * 3, // Auto-refetch setiap 3 detik
+      },
+    },
+  }));
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>

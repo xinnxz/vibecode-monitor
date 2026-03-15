@@ -41,19 +41,43 @@ function hexToFraction(hex: string, offset: number = 0): number {
 }
 
 // ——————————————————————————————————————————
+// Bounding boxes kasar untuk benua-benua utama agar transaksi
+// selalu jatuh di daratan, bukan di lautan luas.
+// Array berbobot: area yang lebih padat/populer bisa diduplikasi.
+// ——————————————————————————————————————————
+const CONTINENT_BOXES = [
+  { name: "North America", minLat: 15, maxLat: 60, minLng: -125, maxLng: -65 },
+  { name: "North America (East)", minLat: 25, maxLat: 45, minLng: -90, maxLng: -70 },
+  { name: "South America", minLat: -50, maxLat: 10, minLng: -80, maxLng: -40 },
+  { name: "Europe",        minLat: 35, maxLat: 65, minLng: -10, maxLng: 35 },
+  { name: "Europe (West)", minLat: 40, maxLat: 55, minLng: -5, maxLng: 20 },
+  { name: "Africa",        minLat: -35, maxLat: 35, minLng: -15, maxLng: 45 },
+  { name: "Asia",          minLat: 10, maxLat: 60, minLng: 45, maxLng: 135 },
+  { name: "Asia (East)",   minLat: 20, maxLat: 45, minLng: 100, maxLng: 140 },
+  { name: "Australia",     minLat: -40, maxLat: -15, minLng: 115, maxLng: 150 },
+  { name: "Indonesia/SEA", minLat: -10, maxLat: 15, minLng: 95, maxLng: 125 },
+];
+
+// ——————————————————————————————————————————
 // Konversi tx hash ke koordinat lat/lng
 // Hash yang sama → koordinat yang sama (deterministik)
+// Diperbarui: Kini selalu diarahkan ke salah satu benua (daratan).
 // ——————————————————————————————————————————
 export function hashToLatLng(hash: string): LatLng {
   if (!hash || hash === "0x") return { lat: 0, lng: 0 };
 
-  // Gunakan bagian berbeda dari hash untuk lat dan lng
-  const latFraction = hexToFraction(hash, 0);  // Karakter 0-7
-  const lngFraction = hexToFraction(hash, 8);  // Karakter 8-15
+  // 1. Pilih benua deterministik berdasarkan 2 karakter pertama
+  const boxIndexFraction = hexToFraction(hash, 0); 
+  const boxIndex = Math.floor(boxIndexFraction * CONTINENT_BOXES.length) % CONTINENT_BOXES.length;
+  const box = CONTINENT_BOXES[boxIndex];
+
+  // 2. Pilih titik lat/lng spesifik di dalam kotak benua tersebut (berdasarkan sisa hash)
+  const latFraction = hexToFraction(hash, 2);
+  const lngFraction = hexToFraction(hash, 10);
 
   return {
-    lat: latFraction * 180 - 90,    // -90 sampai 90
-    lng: lngFraction * 360 - 180,   // -180 sampai 180
+    lat: box.minLat + latFraction * (box.maxLat - box.minLat),
+    lng: box.minLng + lngFraction * (box.maxLng - box.minLng),
   };
 }
 
