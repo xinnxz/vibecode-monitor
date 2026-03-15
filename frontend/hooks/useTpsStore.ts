@@ -16,6 +16,9 @@ interface NetworkStore {
   
   sessionWallets: Set<string>;
   addSessionWallets: (addresses: string[]) => void;
+
+  sessionGasBurned: bigint;
+  addSessionGas: (gas: bigint) => void;
   
   sessionWhales: number;
   incrementSessionWhales: () => void;
@@ -47,6 +50,9 @@ export const useTpsStore = create<NetworkStore>((set) => ({
     addresses.forEach(a => newSet.add(a));
     return { sessionWallets: newSet };
   }),
+
+  sessionGasBurned: BigInt(0),
+  addSessionGas: (gas) => set((state) => ({ sessionGasBurned: state.sessionGasBurned + gas })),
   
   sessionWhales: 0,
   incrementSessionWhales: () => set((state) => ({ sessionWhales: state.sessionWhales + 1 })),

@@ -139,6 +139,9 @@ export function useBlockStream(): UseBlockStreamReturn {
             // --- INSTANT UI AGGREGATORS (Bypass Slow Contract) ---
             const store = useTpsStore.getState();
             store.addSessionTx(processed.txCount);
+            if (processed.gasUsed) {
+              store.addSessionGas(processed.gasUsed);
+            }
             
             // Generate pseudo-wallets from tx hashes for the visual demo
             if (processed.transactions.length > 0) {

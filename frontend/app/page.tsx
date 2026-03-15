@@ -17,7 +17,9 @@ import { motion } from "framer-motion";
 import { ReactNode } from "react";
 import { ProcessedBlock } from "@/hooks/useBlockStream";
 
-// ——— Premium HUD Stat Card (Corner Bracket Style with Standby Telemetry) ———
+// ——— Premium HUD Stat Card (Corner Bracket Style with Live Sparkline) ———
+const SPARKLINE_LENGTH = 16; // Number of bars in the sparkline
+
 function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
   label: string;
   value: React.ReactNode;
@@ -28,11 +30,36 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
   const isIdle = value === 0 || value === "0" || value === "—";
   const isTps = label.toUpperCase().includes("TPS") || label.toUpperCase().includes("ACTIVE TX");
 
-  const targetRef = useRef(String(value));
+  // --- Rolling sparkline history ---
+  // Stores normalized bar heights (0-1). Shifts left on each tick.
+  const [bars, setBars] = useState<number[]>(() => Array(SPARKLINE_LENGTH).fill(0.05));
+  const prevValueRef = useRef<string>(String(value));
 
   useEffect(() => {
-    targetRef.current = String(value);
-  }, [value]);
+    const interval = setInterval(() => {
+      setBars(prev => {
+        const currentStr = String(value);
+        const prevStr = prevValueRef.current;
+        
+        // Determine activity: did the value change since last tick?
+        const changed = currentStr !== prevStr;
+        prevValueRef.current = currentStr;
+
+        let newBar: number;
+        if (changed) {
+          // BIG spike when data changed — randomize height between 0.5 and 1.0
+          newBar = 0.5 + Math.random() * 0.5;
+        } else {
+          // No change this tick — completely flat baseline (datar)
+          newBar = 0.02;
+        }
+
+        return [...prev.slice(1), newBar];
+      });
+    }, 600); // Sample every 600ms = ~1.6 bars/sec, smooth visual rhythm
+
+    return () => clearInterval(interval);
+  }, [value, isIdle]);
 
   // Specific TV Glitch effect ONLY for Live TPS card
   const [tpsGlitch, setTpsGlitch] = useState(false);
@@ -41,8 +68,8 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
     if (!isTps) return;
     const interval = setInterval(() => {
       setTpsGlitch(true);
-      setTimeout(() => setTpsGlitch(false), 250); // Glitch lasts 250ms
-    }, 1000); // exactly every second!
+      setTimeout(() => setTpsGlitch(false), 250);
+    }, 1000);
     return () => clearInterval(interval);
   }, [isTps]);
 
@@ -94,13 +121,13 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
       {/* Content wrapper */}
       <div
         className="relative z-10 flex flex-col items-start text-left"
-        style={{ padding: "14px 24px 14px 18px" }}
+        style={{ padding: "14px 24px 18px 18px" }}
       >
         <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
 
         <div className="flex items-baseline gap-2 mt-1">
           <motion.p
-            key={String(value)} // Re-animate entry on real value change, not jitter
+            key={String(value)}
             initial={{ opacity: 0, x: -5 }}
             animate={{ opacity: 1, x: 0 }}
             className={`text-xl font-bold font-display tracking-wider ${isIdle && !tpsGlitch ? "text-white/80" : colorClass} ${tpsGlitch ? "tv-glitch" : ""}`}
@@ -117,19 +144,25 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor
 
         {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-1 uppercase">{sub}</p>}
 
-        {/* Idle Waveform / EKG line */}
-        {isIdle && (
-          <div className="absolute bottom-2 left-4 right-6 h-3 flex items-end gap-[2px] opacity-50 pointer-events-none">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <motion.div
-                key={i}
-                animate={{ height: [`20%`, `${Math.random() * 80 + 20}%`, `20%`] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
-                style={{ flex: 1, background: borderColor, borderRadius: "1px" }}
-              />
-            ))}
-          </div>
-        )}
+        {/* ——— ALWAYS-ON REACTIVE SPARKLINE ——— */}
+        <div
+          className="absolute bottom-[6px] left-4 right-6 flex items-end gap-[2px] pointer-events-none"
+          style={{ height: "14px" }}
+        >
+          {bars.map((h, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                height: `${Math.max(h * 100, 4)}%`,
+                background: borderColor,
+                opacity: isIdle ? 0.3 + h * 0.4 : 0.4 + h * 0.6,
+                borderRadius: "1px",
+                transition: "height 0.4s ease-out, opacity 0.4s ease-out",
+              }}
+            />
+          ))}
+        </div>
       </div>
     </motion.div>
   );
@@ -175,13 +208,13 @@ function WhaleTicker() {
 export default function DashboardPage() {
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
-  
+
   // Read INSTANT network state from global store (Bypassing slow contracts for the demo)
   const visualTps = useTpsStore((state) => state.visualTps);
   const recentBlocks = useTpsStore((state) => state.recentBlocks);
   const sessionTotalTx = useTpsStore((state) => state.sessionTotalTx);
-  const sessionWallets = useTpsStore((state) => state.sessionWallets);
-  const sessionWhales  = useTpsStore((state) => state.sessionWhales);
+  const sessionGasBurned = useTpsStore((state) => state.sessionGasBurned);
+  const sessionWhales = useTpsStore((state) => state.sessionWhales);
 
   // --- DEBUG TOOL ---
   const injectMockBlock = () => {
@@ -190,10 +223,10 @@ export default function DashboardPage() {
       hash: "0x" + Math.random().toString(16).slice(2, 40) + "mock",
       txCount: Math.floor(Math.random() * 20) + 1, // Generate 1-20 TXs to test all 3 colors
       timestamp: Date.now(),
-      gasUsed: BigInt(0),
+      gasUsed: BigInt(Math.floor(Math.random() * 20_000_000) + 1_000_000), // Fake 1M-21M gas
       transactions: Array.from({ length: 5 }, () => "0x" + Math.random().toString(16).slice(2, 40)),
     };
-    
+
     // Inject directly into the store so the Sidebar picks it up as a "new" block
     const store = useTpsStore.getState();
     store.setRecentBlocks([mockBlock, ...store.recentBlocks].slice(0, 15));
@@ -232,7 +265,7 @@ export default function DashboardPage() {
         {/* HUD Stats Cards (Bottom Left) */}
         <div
           className="absolute pointer-events-auto"
-          style={{ bottom: "40px", left: "40px", display: "flex", flexWrap: "wrap", gap: "24px" }}
+          style={{ bottom: "24px", left: "40px", display: "flex", flexWrap: "wrap", gap: "24px" }}
         >
           <StatCard
             label="Total TX"
@@ -253,11 +286,11 @@ export default function DashboardPage() {
             borderColor="#818cf8"
           />
           <StatCard
-            label="Wallets"
-            value={formatCompact(sessionWallets.size)}
-            sub="Unique Instances"
-            colorClass="text-blue-400"
-            borderColor="#3b82f6"
+            label="Gas Burned"
+            value={formatCompact(Number(sessionGasBurned))}
+            sub="Total Computation"
+            colorClass="text-yellow-400"
+            borderColor="#eab308"
           />
           <StatCard
             label="Whales"
@@ -271,13 +304,21 @@ export default function DashboardPage() {
         {/* ——— Whale Ticker (Bottom Edge) ——— */}
         <WhaleTicker />
 
-        {/* DEBUG BUTTON */}
-        <button 
-          onClick={injectMockBlock}
-          className="absolute right-8 bottom-[520px] pointer-events-auto px-4 py-2 bg-purple-600/30 border border-purple-500/50 text-purple-200 text-xs font-mono rounded hover:bg-purple-500/50 transition-colors backdrop-blur-sm"
-        >
-          [DEBUG] Inject Mock Block
-        </button>
+        {/* DEBUG BUTTONS */}
+        <div className="absolute right-8 bottom-[520px] pointer-events-auto flex flex-col gap-2">
+          <button
+            onClick={injectMockBlock}
+            className="px-4 py-2 bg-purple-600/30 border border-purple-500/50 text-purple-200 text-xs font-mono rounded hover:bg-purple-500/50 transition-colors backdrop-blur-sm"
+          >
+            [DEBUG] Inject Mock Block
+          </button>
+          <button
+            onClick={() => useTpsStore.getState().incrementSessionWhales()}
+            className="px-4 py-2 bg-red-600/30 border border-red-500/50 text-red-200 text-xs font-mono rounded hover:bg-red-500/50 transition-colors backdrop-blur-sm"
+          >
+            🐋 [DEBUG] Inject Whale Alert
+          </button>
+        </div>
       </div>
 
     </div>
