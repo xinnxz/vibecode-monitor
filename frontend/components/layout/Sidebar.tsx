@@ -73,7 +73,6 @@ function useDecodeText(target: string, duration = 700, active = true): string {
 }
 
 // ——— Global Smart Queue Manager ———
-let globalAccumulator = 0; // Tracks incoming TX bursts and decays smoothly
 
 type QueueManager = {
   unseen: ProcessedBlock[];
@@ -129,9 +128,7 @@ function SmartCycleSlot({
           setPhase("locking");
           setFlash(true);
 
-          // Add this block's TX strictly to the global visual accumulator
-          globalAccumulator += selectedBlock.txCount;
-          
+
           // PERFECT SYNC: Tell the Globe to render EXACTLY what the sidebar is rendering right now
           useTpsStore.getState().pushGlobeBlock(selectedBlock);
 
@@ -301,9 +298,13 @@ export function Sidebar() {
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
-      // User requested that the Active TX count does not reset/decay,
-      // it should accumulate exactly like the Total TX counter.
-      const visualTps = globalAccumulator;
+      // Exactly calculate the sum of TX currently locked and visible in the sidebar slots
+      let currentActiveTx = 0;
+      queueManager.current.currentlyDisplaying.forEach((txCount) => {
+        currentActiveTx += txCount;
+      });
+
+      const visualTps = currentActiveTx;
 
       if (visualTps !== lastEmitted) {
         useTpsStore.getState().setVisualTps(visualTps);
