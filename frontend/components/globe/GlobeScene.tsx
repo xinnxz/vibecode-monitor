@@ -1,11 +1,15 @@
 "use client";
 // components/globe/GlobeScene.tsx
 // ============================================================
-// Main 3D scene: Earth globe + live TX visualizations.
-// Uses useGlobeTxFeed for centralized data → visual mapping.
+// Hybrid Hub + Ripple Globe Scene (Idea 4):
+//   - All TX arcs fly FROM random world cities → Somnia Hub (Singapore)
+//   - Hub pulses faster with higher TPS, flashes on each new block
+//   - On arc landing → HubRipple outward wave
+//   - Whale TX → outbound arc FROM hub → destination (gold)
+//   - Impact burst at whale destination
 // ============================================================
 
-import { Suspense } from "react";
+import { Suspense, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 
@@ -14,51 +18,50 @@ import { SpaceEnvironment } from "./SpaceEnvironment";
 import { NodePing }         from "./NodePing";
 import { FlyArc }           from "./FlyArc";
 import { WhalePulse }       from "./WhalePulse";
-import { GlobePulseRing }   from "./GlobePulseRing";
 import { ImpactBurst }      from "./ImpactBurst";
-
+import { SomniaHub }        from "./SomniaHub";
+import { HubRipple }        from "./HubRipple";
+import { HUB_LAT, HUB_LNG } from "./SomniaHub";
 import { useGlobeTxFeed }   from "@/hooks/useGlobeTxFeed";
 
 export function GlobeScene() {
   const {
-    pings, arcs, bursts, pulses, flashes,
-    removePing, removeArc, removeBurst, removePulse, removeFlash,
+    pings, arcs, bursts, pulses, ripples,
+    hubFlash, tps,
+    removePing, onArcLanded,
+    removeBurst, removePulse, removeRipple,
   } = useGlobeTxFeed();
 
   return (
     <Canvas
-      camera={{
-        position: [0, 20, 160],
-        fov: 45,
-        near: 1,
-        far: 2000,
-      }}
+      camera={{ position: [0, 20, 160], fov: 45, near: 1, far: 2000 }}
       gl={{
         antialias: true,
         alpha: false,
         powerPreference: "high-performance",
-        toneMapping: 6, // ACESFilmicToneMapping
+        toneMapping: 6,
         toneMappingExposure: 1.2,
       }}
       style={{ background: "#010204" }}
     >
       <Suspense fallback={null}>
-        {/* ——— Space: nebula skybox, moon, stars, lighting ——— */}
+        {/* ——— Environment ——— */}
         <SpaceEnvironment />
-
-        {/* ——— Earth ——— */}
         <EarthGlobe />
 
-        {/* ——— Globe Pulse Rings (block arrival sonar) ——— */}
-        {flashes.map((f) => (
-          <GlobePulseRing
-            key={f.id}
-            color={f.color}
-            onDone={() => removeFlash(f.id)}
+        {/* ——— Somnia Hub — permanent anchor at Singapore ——— */}
+        <SomniaHub tps={tps} flash={hubFlash} />
+
+        {/* ——— Hub Ripples — triggered when arcs land ——— */}
+        {ripples.map((r) => (
+          <HubRipple
+            key={r.id}
+            color={r.color}
+            onDone={() => removeRipple(r.id)}
           />
         ))}
 
-        {/* ——— Node Pings (TX origin markers) ——— */}
+        {/* ——— Node Pings — TX origin markers ——— */}
         {pings.map((p) => (
           <NodePing
             key={p.id}
@@ -70,22 +73,25 @@ export function GlobeScene() {
           />
         ))}
 
-        {/* ——— Laser Arcs (TX flight paths) ——— */}
-        {arcs.map((a) => (
-          <FlyArc
-            key={a.id}
-            fromLat={a.fromLat}
-            fromLng={a.fromLng}
-            toLat={a.toLat}
-            toLng={a.toLng}
-            color={a.color}
-            speed={a.speed}
-            intensity={a.intensity}
-            onDone={() => removeArc(a.id)}
-          />
-        ))}
+        {/* ——— Laser Arcs — TX flights to/from hub ——— */}
+        {arcs.map((a) => {
+          const isWhale = a.color === "#f59e0b" && a.intensity >= 1.0;
+          return (
+            <FlyArc
+              key={a.id}
+              fromLat={a.fromLat}
+              fromLng={a.fromLng}
+              toLat={a.toLat}
+              toLng={a.toLng}
+              color={a.color}
+              speed={a.speed}
+              intensity={a.intensity}
+              onDone={() => onArcLanded(a.id, isWhale)}
+            />
+          );
+        })}
 
-        {/* ——— Impact Bursts (TX landing particle explosions) ——— */}
+        {/* ——— Impact Bursts — at whale TX destinations ——— */}
         {bursts.map((b) => (
           <ImpactBurst
             key={b.id}
@@ -96,7 +102,7 @@ export function GlobeScene() {
           />
         ))}
 
-        {/* ——— Whale Pulses (large TX indicators) ——— */}
+        {/* ——— Whale Pulses — large TX visual indicators ——— */}
         {pulses.map((p) => (
           <WhalePulse
             key={p.id}
@@ -109,7 +115,6 @@ export function GlobeScene() {
         <Preload all />
       </Suspense>
 
-      {/* OrbitControls must be outside Suspense */}
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
