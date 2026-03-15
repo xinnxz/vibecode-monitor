@@ -81,11 +81,20 @@ export function useGlobeTxFeed() {
     // Phase 1 arrays (T = 0s)
     const newPings: ActivePing[] = [];
     
+    // VISUAL HONESTY: Render EXACTLY txCount arcs, not just the sliced hashes length
+    // If txCount is huge, cap at 300 to prevent browser crash, but it will be a massively dense visual burst.
+    const renderCount = Math.min(txCount, 300);
+
     // Arrays for Phase 2 & 3 closures
-    const hashesData = txHashes.map((hash, i) => {
-      const from = hashToLatLng(hash);
+    const hashesData = Array.from({ length: renderCount }).map((_, i) => {
+      // Use available hashes, or fallback/wrap around to create pseudo-random organic routing based on the hash string
+      const hash = txHashes[i % txHashes.length] || Date.now().toString(16); 
+      // Add 'i' to the hash to ensure different destinations when reusing the same base hash
+      const uniqueHash = `${hash}-${i}`;
+      
+      const from = hashToLatLng(uniqueHash);
       const isHubBound = Math.random() < 0.2;
-      const to = isHubBound ? { lat: HUB_LAT, lng: HUB_LNG } : hashToLatLng(hash + "destination");
+      const to = isHubBound ? { lat: HUB_LAT, lng: HUB_LNG } : hashToLatLng(uniqueHash + "destination");
       return { id: `${ts}-${i}`, from, to, isHubBound };
     });
 
