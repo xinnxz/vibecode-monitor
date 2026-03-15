@@ -1,16 +1,7 @@
 "use client";
 // components/globe/GlobeScene.tsx
-// ============================================================
-// Komponen utama Canvas — mengikat semua sub-komponen globe.
-//
-// Perubahan dari versi sebelumnya:
-// - Camera position (0, 20, 160) sesuai referensi globe.js
-// - Earth radius = 50 (bukan 1.0) — sama dengan referensi
-// - SpaceEnvironment menggantikan StarField sederhana
-// - Lighting sudah ada di SpaceEnvironment, tidak perlu di sini
-// ============================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 
@@ -103,45 +94,50 @@ export function GlobeScene() {
       }}
       style={{ background: "#010204" }}
     >
-      {/* ——— Space: nebula skybox, moon, 3D bintang, lighting ——— */}
-      <SpaceEnvironment />
+      {/* Suspense WAJIB untuk useLoader di EarthGlobe / SpaceEnvironment */}
+      <Suspense fallback={null}>
+        {/* ——— Space: nebula skybox, moon, bintang, lighting ——— */}
+        <SpaceEnvironment />
 
-      {/* ——— Bumi ——— */}
-      <EarthGlobe />
+        {/* ——— Bumi ——— */}
+        <EarthGlobe />
 
-      {/* ——— Node pings per tx ——— */}
-      {pings.map((p) => (
-        <NodePing
-          key={p.id}
-          lat={p.lat}
-          lng={p.lng}
-          color={p.color}
-          onDone={() => setPings((prev) => prev.filter((x) => x.id !== p.id))}
-        />
-      ))}
+        {/* ——— Node pings per tx ——— */}
+        {pings.map((p) => (
+          <NodePing
+            key={p.id}
+            lat={p.lat}
+            lng={p.lng}
+            color={p.color}
+            onDone={() => setPings((prev) => prev.filter((x) => x.id !== p.id))}
+          />
+        ))}
 
-      {/* ——— Laser arcs per tx ——— */}
-      {arcs.map((a) => (
-        <FlyArc
-          key={a.id}
-          fromLat={a.fromLat} fromLng={a.fromLng}
-          toLat={a.toLat}     toLng={a.toLng}
-          color={a.color}
-          onDone={() => setArcs((prev) => prev.filter((x) => x.id !== a.id))}
-        />
-      ))}
+        {/* ——— Laser arcs per tx ——— */}
+        {arcs.map((a) => (
+          <FlyArc
+            key={a.id}
+            fromLat={a.fromLat} fromLng={a.fromLng}
+            toLat={a.toLat}     toLng={a.toLng}
+            color={a.color}
+            onDone={() => setArcs((prev) => prev.filter((x) => x.id !== a.id))}
+          />
+        ))}
 
-      {/* ——— Whale Pulses ——— */}
-      {pulses.map((p) => (
-        <WhalePulse
-          key={p.id}
-          lat={p.lat}
-          lng={p.lng}
-          onDone={() => setPulses((prev) => prev.filter((x) => x.id !== p.id))}
-        />
-      ))}
+        {/* ——— Whale Pulses ——— */}
+        {pulses.map((p) => (
+          <WhalePulse
+            key={p.id}
+            lat={p.lat}
+            lng={p.lng}
+            onDone={() => setPulses((prev) => prev.filter((x) => x.id !== p.id))}
+          />
+        ))}
 
-      {/* ——— Mouse controls (matching reference) ——— */}
+        <Preload all />
+      </Suspense>
+
+      {/* OrbitControls harus di luar Suspense */}
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
@@ -151,8 +147,7 @@ export function GlobeScene() {
         minDistance={80}
         maxDistance={350}
       />
-
-      <Preload all />
     </Canvas>
   );
 }
+
