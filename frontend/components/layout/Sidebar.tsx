@@ -16,7 +16,7 @@ type FeedItem =
   | { type: "block"; data: ProcessedBlock; key: string }
   | { type: "whale"; data: WhaleAlertEvent; key: string };
 
-// ——— Block Entry Redesigned ———
+// ——— Block Entry Redesigned (Mass Effect Style) ———
 function BlockEntry({ block }: { block: ProcessedBlock }) {
   const time = new Date(block.timestamp * 1000).toLocaleTimeString("en-US", {
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
@@ -27,54 +27,66 @@ function BlockEntry({ block }: { block: ProcessedBlock }) {
       layout
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex flex-col gap-1.5 px-4 py-3 mx-2 my-1 rounded-xl hover:bg-white/[0.03] border border-transparent hover:border-white/[0.05] transition-all cursor-default"
+      className="group flex items-center gap-4 px-4 py-3 mx-2 my-2 bg-black/40 border border-white/10 hover:border-purple-500/50 hover:bg-white/5 transition-all cursor-default rounded-md pointer-events-auto"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-purple-500 opacity-50 group-hover:opacity-100 transition-opacity" />
-          <span className="text-purple-300 text-xs font-mono font-bold tracking-wide">
-            #{block.number.toLocaleString()}
-          </span>
-        </div>
-        <span className="text-white/30 text-[10px] font-mono">{time}</span>
+      {/* Icon Element */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full border border-purple-500/30 flex items-center justify-center bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
+        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_#9d00ff]" />
       </div>
-      <div className="flex items-center justify-between pl-3.5">
-        <span className="text-white/50 text-[10px] font-mono tracking-wider truncate max-w-[160px] group-hover:text-indigo-300 transition-colors">
-          {block.hash.slice(0, 18)}...
-        </span>
-        <div className="flex items-center gap-1 bg-indigo-500/20 px-1.5 py-0.5 rounded text-indigo-400 text-[9px] font-mono font-bold border border-indigo-500/30">
-          {block.txCount} TX
+
+      {/* Text Content */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <span className="text-white/90 text-[11px] font-bold font-display tracking-widest uppercase truncate max-w-[120px]">
+            Block #{block.number.toLocaleString()}
+          </span>
+          <span className="text-white/30 text-[9px] font-mono shrink-0">{time}</span>
+        </div>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-white/40 text-[10px] font-mono truncate max-w-[110px] group-hover:text-indigo-300 transition-colors">
+            {block.hash}
+          </span>
+          <span className="text-indigo-400 text-[10px] font-mono font-bold shrink-0">
+            {block.txCount} TX
+          </span>
         </div>
       </div>
     </motion.div>
   );
 }
 
-// ——— Whale Entry Redesigned ———
+// ——— Whale Entry Redesigned (Mass Effect Style) ———
 function WhaleEntry({ alert }: { alert: WhaleAlertEvent }) {
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col gap-1.5 px-4 py-3 mx-2 my-2 rounded-xl glass-red relative overflow-hidden"
+      className="group flex items-center gap-4 px-4 py-3 mx-2 my-2 bg-red-950/20 border border-red-500/30 hover:border-red-500/60 transition-all rounded-md relative overflow-hidden pointer-events-auto"
     >
-      {/* Side glow accent */}
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 shadow-[0_0_10px_#ef4444]" />
-      
-      <div className="flex items-center justify-between pl-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-red-400 tracking-widest animate-pulse">WHALE ALERT</span>
+
+      {/* Icon Element */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full border border-red-500/30 flex items-center justify-center bg-red-500/10">
+        <span className="text-red-500 text-[10px] font-bold font-mono shadow-[0_0_8px_#ef4444]">W</span>
+      </div>
+
+      {/* Text Content */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <span className="text-red-100 text-[11px] font-bold font-display tracking-widest uppercase">
+            Whale Anomaly
+          </span>
+          <span className="text-red-500/40 text-[9px] font-mono shrink-0">#{alert.id}</span>
         </div>
-        <span className="text-red-500/40 text-[9px] font-mono">#{alert.id}</span>
-      </div>
-      <div className="pl-1 text-red-200 text-sm font-mono font-bold tracking-wide">
-        {alert.amountFormatted} <span className="text-[10px] text-red-400/60">STT</span>
-      </div>
-      <div className="pl-1 text-white/50 text-[10px] font-mono flex items-center gap-2">
-        <span>{shortAddress(alert.from)}</span>
-        <span className="text-red-500/50">→</span>
-        <span>{shortAddress(alert.to)}</span>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-white/50 text-[10px] font-mono truncate max-w-[100px]">
+            {shortAddress(alert.from)} → {shortAddress(alert.to)}
+          </span>
+          <span className="text-red-400 text-[10px] font-mono font-bold shrink-0">
+            {alert.amountFormatted} STT
+          </span>
+        </div>
       </div>
     </motion.div>
   );
@@ -100,28 +112,19 @@ export function Sidebar() {
   }, [recentBlocks, whaleAlerts]);
 
   return (
-    <aside className="fixed top-24 right-6 bottom-14 w-80 flex flex-col glass rounded-2xl z-40 overflow-hidden shadow-2xl">
-      {/* Top Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-white/[0.02]">
-        <div className="flex items-center gap-2">
-          <span className="text-purple-400 font-mono text-xs animate-pulse">■</span>
-          <span className="text-white/80 text-xs font-bold font-mono uppercase tracking-widest">
-            Live Feed
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-400 shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
-          <span className={`text-[9px] font-bold font-mono tracking-wider ${isConnected ? "text-emerald-400" : "text-red-400"}`}>
-            {isConnected ? "CONNECTED" : "OFFLINE"}
-          </span>
-        </div>
+    <aside className="absolute top-28 right-8 bottom-16 w-80 flex flex-col z-40 pointer-events-none">
+
+      {/* Top Header removed to match reference (bare cards) OR keep a subtle one */}
+      <div className="flex items-center justify-between px-5 py-2 mb-4">
+        <span className="text-white/50 text-[10px] font-bold font-mono uppercase tracking-widest">
+          Terminal Feed
+        </span>
       </div>
 
       {/* Feed List */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin overflow-x-hidden py-1 relative">
-        {/* Subtle top/bottom inner shadows for depth */}
-        <div className="sticky top-0 h-4 bg-gradient-to-b from-[var(--color-bg-panel)] to-transparent z-10 pointer-events-none" />
-        
+      <div className="flex-1 overflow-y-auto scrollbar-thin overflow-x-hidden relative">
+        {/* Subtle top/bottom inner shadow fades removed to keep it completely flat */}
+
         {feedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[80%] text-white/30 text-xs font-mono text-center px-6">
             <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-purple-500 animate-spin mb-4" />
@@ -138,16 +141,6 @@ export function Sidebar() {
             )}
           </AnimatePresence>
         )}
-      </div>
-
-      {/* Footer Stats */}
-      <div className="px-5 py-3 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
-        <span className="text-white/30 text-[9px] font-mono tracking-widest uppercase">
-          Cache: {recentBlocks.length} blk
-        </span>
-        <span className="text-red-400/60 text-[9px] font-mono tracking-widest uppercase">
-          Whales: {whaleAlerts.length}
-        </span>
       </div>
     </aside>
   );

@@ -42,23 +42,29 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", bgAccent = 
   return (
     <motion.div
       layout
-      className="relative glass rounded-2xl px-6 py-4 flex flex-col justify-center items-center text-center min-w-[140px] overflow-hidden group hover:bg-white/[0.02] transition-colors"
+      className="relative bg-gradient-to-r from-black/60 via-black/20 to-transparent min-w-[160px] group hover:from-white/10 hover:to-transparent transition-all cursor-default pointer-events-auto"
     >
-      {/* Soft background radial glow */}
-      <div className={`absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-10 blur-2xl pointer-events-none ${bgAccent}`} />
+      {/* Edge Accent Glow */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 ${bgAccent} opacity-80 group-hover:opacity-100 transition-opacity`}
+        style={{ width: '2px' }}
+      />
 
-      {/* Centered Content Wrapper */}
-      <div className="relative z-10 w-full flex flex-col items-center">
-        <p className="text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1">{label}</p>
+      {/* Content wrapper */}
+      <div
+        className="relative z-10 flex flex-col items-start text-left py-3"
+        style={{ paddingLeft: '8px', paddingRight: '20px' }}
+      >
+        <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
         <motion.p
           key={String(value)}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className={`text-2xl font-bold font-mono tracking-tight ${colorClass} drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]`}
+          initial={{ opacity: 0, x: -5 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={`text-xl font-bold font-display tracking-wider ${colorClass} text-shadow-glow mt-0.5`}
         >
           {value}
         </motion.p>
-        {sub && <p className="text-[10px] text-white/30 font-mono tracking-wider mt-0.5 uppercase">{sub}</p>}
+        {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-0.5 uppercase">{sub}</p>}
       </div>
     </motion.div>
   );
@@ -107,63 +113,92 @@ export default function DashboardPage() {
   const { alerts: whaleAlerts } = useWhaleAlerts();
 
   return (
-    <div className="relative w-full h-dvh overflow-hidden bg-[var(--color-bg)]">
+    <div className="fixed inset-0 bg-[#010204] p-2 md:p-6 lg:p-8">
 
-      {/* ——— Navbar (Floating Dynamic Islands) ——— */}
-      <Navbar />
+      {/* ——— HUD Viewfinder Frame (Mass Effect Style) ——— */}
+      <div className="relative w-full h-full rounded-[2rem] border border-white/10 overflow-hidden bg-black/50 shadow-[0_0_50px_rgba(0,0,0,0.5)_inset,0_0_0_1px_rgba(255,255,255,0.02)]">
 
-      {/* ——— Main 3D Environment ——— */}
-      <main className="absolute inset-0">
+        {/* Corner Accents */}
+        <div className="absolute top-0 left-0 w-32 h-32 border-t border-l border-red-500/30 rounded-tl-[2rem] z-0 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-32 h-32 border-b border-r border-red-500/30 rounded-br-[2rem] z-0 pointer-events-none" />
 
-        <div className="w-full h-full mix-blend-screen">
-          <GlobeScene />
+        {/* ——— Vertical Telemetry (Left Edge) ——— */}
+        <div className="absolute top-32 left-6 flex flex-col gap-12 z-20 pointer-events-none opacity-50">
+          <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+            <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${tps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
+              <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${tps > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                {tps > 0 ? "ONLINE" : "OFFLINE"}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+            <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Block Hash</span>
+            <span className="text-[11px] font-bold tracking-[0.2em] font-mono text-purple-400">
+              {stats.totalTransactions > 0 ? `#${(stats.totalTransactions * 123).toString().substring(0, 6)}` : "AWAITING"}
+            </span>
+          </div>
         </div>
 
-        {/* Cinematic Vignette Overlay to darken edges for UI focus */}
-        <div className="absolute inset-0 vignette pointer-events-none z-0" />
+        {/* ——— Navbar (Absolute within Frame) ——— */}
+        <Navbar />
 
-        {/* ——— HUD Stats Cards (Bottom Left) ——— */}
-        <div className="absolute bottom-4 left-4 flex flex-wrap gap-4 z-10 pointer-events-auto">
-          <StatCard
-            label="Total TX"
-            value={formatCompact(stats.totalTransactions)}
-            sub="All Time"
-            colorClass="text-purple-400"
-            bgAccent="bg-purple-500"
-          />
-          <StatCard
-            label="Live TPS"
-            value={tps > 0 ? tps : "—"}
-            sub="Transactions/Sec"
-            colorClass="text-indigo-400"
-            bgAccent="bg-indigo-500"
-          />
-          <StatCard
-            label="Wallets"
-            value={formatCompact(stats.uniqueAddressCount)}
-            sub="Unique Tracking"
-            colorClass="text-blue-400"
-            bgAccent="bg-blue-600"
-          />
-          <StatCard
-            label="Whales"
-            value={whaleAlerts.length}
-            sub="Detected Anomaly"
-            colorClass="text-red-400"
-            bgAccent="bg-red-500"
-          />
+        {/* ——— Main 3D Environment ——— */}
+        <main className="absolute inset-0 z-0">
+          <div className="w-full h-full mix-blend-screen">
+            <GlobeScene />
+          </div>
+
+          {/* Cinematic Vignette Overlay */}
+          <div className="absolute inset-0 vignette pointer-events-none z-0" />
+        </main>
+
+        {/* ——— Foreground UI Elements ——— */}
+        <div className="absolute inset-0 z-10 pointer-events-none">
+
+          {/* HUD Stats Cards (Bottom Left inside frame) */}
+          <div className="absolute bottom-6 left-6 flex flex-wrap gap-4 pointer-events-auto">
+            <StatCard
+              label="Total TX"
+              value={formatCompact(stats.totalTransactions)}
+              sub="All Time"
+              colorClass="text-purple-400"
+              bgAccent="bg-purple-500"
+            />
+            <StatCard
+              label="Live TPS"
+              value={tps > 0 ? tps : "—"}
+              sub="Transactions/Sec"
+              colorClass="text-indigo-400"
+              bgAccent="bg-indigo-500"
+            />
+            <StatCard
+              label="Wallets"
+              value={formatCompact(stats.uniqueAddressCount)}
+              sub="Unique Tracking"
+              colorClass="text-blue-400"
+              bgAccent="bg-blue-600"
+            />
+            <StatCard
+              label="Whales"
+              value={whaleAlerts.length}
+              sub="Detected Anomaly"
+              colorClass="text-red-400"
+              bgAccent="bg-red-500"
+            />
+          </div>
+
+          {/* ——— Sidebar (Floating Panel Right) ——— */}
+          <div className="pointer-events-auto">
+            <Sidebar />
+          </div>
+
+          {/* ——— Whale Ticker (Bottom Edge inside frame) ——— */}
+          <WhaleTicker />
         </div>
-      </main>
 
-      {/* ——— Sidebar (Floating Panel Right) ——— */}
-      {/* Pointer events bound automatically inside the component */}
-      <div className="pointer-events-auto">
-        <Sidebar />
       </div>
-
-      {/* ——— Whale Ticker (Bottom Edge) ——— */}
-      <WhaleTicker />
-
     </div>
   );
 }
