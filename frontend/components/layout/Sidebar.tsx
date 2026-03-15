@@ -27,15 +27,25 @@ function BlockEntry({ block }: { block: ProcessedBlock }) {
       layout
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex items-center gap-4 px-4 py-3 mx-2 my-2 bg-black/40 border border-white/10 hover:border-purple-500/50 hover:bg-white/5 transition-all cursor-default rounded-md pointer-events-auto"
+      className="group flex items-center px-4 py-3 mx-2 my-2 bg-black/40 border border-white/10 hover:border-purple-500/50 hover:bg-white/5 transition-all cursor-default rounded-md pointer-events-auto relative overflow-hidden"
+      style={{ gap: "12px" }}
     >
-      {/* Icon Element */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full border border-purple-500/30 flex items-center justify-center bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_#9d00ff]" />
-      </div>
+      {/* Vertical Status Bar (left edge) */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: "20%",
+          bottom: "20%",
+          width: "2px",
+          background: "#a855f7",
+          boxShadow: "0 0 6px rgba(168, 85, 247, 0.5)",
+          borderRadius: "1px",
+        }}
+      />
 
       {/* Text Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ marginLeft: "8px" }}>
         <div className="flex items-center justify-between">
           <span className="text-white/90 text-[11px] font-bold font-display tracking-widest uppercase truncate max-w-[120px]">
             Block #{block.number.toLocaleString()}
@@ -62,17 +72,25 @@ function WhaleEntry({ alert }: { alert: WhaleAlertEvent }) {
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="group flex items-center gap-4 px-4 py-3 mx-2 my-2 bg-red-950/20 border border-red-500/30 hover:border-red-500/60 transition-all rounded-md relative overflow-hidden pointer-events-auto"
+      className="group flex items-center px-4 py-3 mx-2 my-2 bg-red-950/20 border border-red-500/30 hover:border-red-500/60 transition-all rounded-md relative overflow-hidden pointer-events-auto"
+      style={{ gap: "12px" }}
     >
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 shadow-[0_0_10px_#ef4444]" />
-
-      {/* Icon Element */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full border border-red-500/30 flex items-center justify-center bg-red-500/10">
-        <span className="text-red-500 text-[10px] font-bold font-mono shadow-[0_0_8px_#ef4444]">W</span>
-      </div>
+      {/* Vertical Status Bar (left edge - red for whale) */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: "15%",
+          bottom: "15%",
+          width: "2px",
+          background: "#ef4444",
+          boxShadow: "0 0 8px rgba(239, 68, 68, 0.6)",
+          borderRadius: "1px",
+        }}
+      />
 
       {/* Text Content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ marginLeft: "8px" }}>
         <div className="flex items-center justify-between">
           <span className="text-red-100 text-[11px] font-bold font-display tracking-widest uppercase">
             Whale Anomaly

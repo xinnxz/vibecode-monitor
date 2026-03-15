@@ -62,9 +62,9 @@ export function WalletButton() {
   // ——— State: Connected di chain yang benar ———
   if (isConnected && shortAddress) {
     return (
-      <div className="flex items-center glass-pill px-2 py-1.5">
+      <div className="flex items-center glass-pill" style={{ padding: "6px 8px" }}>
         {/* Badge alamat */}
-        <div className="flex items-center gap-3 px-5 py-2.5 border-r border-white/5">
+        <div className="flex items-center border-r border-white/5" style={{ gap: "12px", padding: "10px 20px" }}>
           <div className="relative flex items-center justify-center">
              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
              <span className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-60" />

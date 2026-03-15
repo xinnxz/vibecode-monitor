@@ -31,36 +31,69 @@ const GlobeScene = dynamic(
   }
 );
 
-// ——— Premium HUD Stat Card ———
-function StatCard({ label, value, sub, colorClass = "text-cyan-400", bgAccent = "bg-cyan-500" }: {
+// ——— Premium HUD Stat Card (Corner Bracket Style) ———
+function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
   label: string;
   value: string | number;
   sub?: string;
   colorClass?: string;
-  bgAccent?: string;
+  borderColor?: string;
 }) {
   return (
     <motion.div
       layout
-      className="relative bg-gradient-to-r from-black/60 via-black/20 to-transparent min-w-[160px] group hover:from-white/10 hover:to-transparent transition-all cursor-default pointer-events-auto"
+      className="relative min-w-[160px] group cursor-default pointer-events-auto"
+      style={{
+        background: "linear-gradient(to right, rgba(0,0,0,0.5), rgba(0,0,0,0.15), transparent)",
+      }}
     >
-      {/* Edge Accent Glow */}
+      {/* Top-Left Corner Bracket ⌐ */}
       <div
-        className={`absolute left-0 top-0 bottom-0 w-[2px] ${bgAccent} opacity-80 group-hover:opacity-100 transition-opacity`}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "12px",
+          height: "12px",
+          borderTop: `2px solid ${borderColor}`,
+          borderLeft: `2px solid ${borderColor}`,
+          opacity: 0.7,
+          transition: "opacity 0.3s",
+        }}
+        className="group-hover:opacity-100"
+      />
+
+      {/* Bottom-Right Corner Bracket ¬ */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: 0,
+          width: "12px",
+          height: "12px",
+          borderBottom: `2px solid ${borderColor}`,
+          borderRight: `2px solid ${borderColor}`,
+          opacity: 0.7,
+          transition: "opacity 0.3s",
+        }}
+        className="group-hover:opacity-100"
       />
 
       {/* Content wrapper */}
-      <div className="relative z-10 flex flex-col items-start text-left py-4 pl-4 pr-6">
+      <div
+        className="relative z-10 flex flex-col items-start text-left"
+        style={{ padding: "14px 24px 14px 18px" }}
+      >
         <p className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{label}</p>
         <motion.p
           key={String(value)}
           initial={{ opacity: 0, x: -5 }}
           animate={{ opacity: 1, x: 0 }}
-          className={`text-xl font-bold font-display tracking-wider ${colorClass} text-shadow-glow mt-0.5`}
+          className={`text-xl font-bold font-display tracking-wider ${colorClass} mt-1`}
         >
           {value}
         </motion.p>
-        {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-0.5 uppercase">{sub}</p>}
+        {sub && <p className="text-[9px] text-white/30 font-mono tracking-wider mt-1 uppercase">{sub}</p>}
       </div>
     </motion.div>
   );
@@ -109,17 +142,14 @@ export default function DashboardPage() {
   const { alerts: whaleAlerts } = useWhaleAlerts();
 
   return (
-    <div className="fixed inset-0 bg-[#010204] p-2 md:p-6 lg:p-8">
+    <div className="fixed inset-0 bg-[#010204] overflow-hidden">
 
-      {/* ——— HUD Viewfinder Frame (Mass Effect Style) ——— */}
-      <div className="relative w-full h-full rounded-[2rem] border border-white/10 overflow-hidden bg-black/50 shadow-[0_0_50px_rgba(0,0,0,0.5)_inset,0_0_0_1px_rgba(255,255,255,0.02)]">
-
-        {/* Corner Accents */}
-        <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 rounded-tl-[2rem] z-0 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 rounded-br-[2rem] z-0 pointer-events-none" />
+        {/* Corner Accents (screen edges) */}
+        <div className="absolute top-0 left-0 w-40 h-40 border-t border-l border-red-500/30 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-40 h-40 border-b border-r border-red-500/30 z-30 pointer-events-none" />
 
         {/* ——— Vertical Telemetry (Left Edge) ——— */}
-        <div className="absolute top-36 left-8 flex flex-col gap-14 z-20 pointer-events-none opacity-50">
+        <div className="absolute top-36 left-8 flex flex-col z-20 pointer-events-none opacity-50" style={{ gap: "56px" }}>
           <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
             <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
             <div className="flex items-center gap-2">
@@ -137,10 +167,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ——— Navbar (Absolute within Frame) ——— */}
+        {/* ——— Navbar ——— */}
         <Navbar />
 
-        {/* ——— Main 3D Environment ——— */}
+        {/* ——— Main 3D Environment (Full Screen) ——— */}
         <main className="absolute inset-0 z-0">
           <div className="w-full h-full mix-blend-screen">
             <GlobeScene />
@@ -153,35 +183,38 @@ export default function DashboardPage() {
         {/* ——— Foreground UI Elements ——— */}
         <div className="absolute inset-0 z-10 pointer-events-none">
 
-          {/* HUD Stats Cards (Bottom Left inside frame) */}
-          <div className="absolute bottom-10 left-10 flex flex-wrap gap-6 pointer-events-auto">
+          {/* HUD Stats Cards (Bottom Left) */}
+          <div
+            className="absolute pointer-events-auto"
+            style={{ bottom: "40px", left: "40px", display: "flex", flexWrap: "wrap", gap: "24px" }}
+          >
             <StatCard
               label="Total TX"
               value={formatCompact(stats.totalTransactions)}
               sub="All Time"
               colorClass="text-purple-400"
-              bgAccent="bg-purple-500"
+              borderColor="#a855f7"
             />
             <StatCard
               label="Live TPS"
               value={tps > 0 ? tps : "—"}
               sub="Transactions/Sec"
               colorClass="text-indigo-400"
-              bgAccent="bg-indigo-500"
+              borderColor="#818cf8"
             />
             <StatCard
               label="Wallets"
               value={formatCompact(stats.uniqueAddressCount)}
               sub="Unique Tracking"
               colorClass="text-blue-400"
-              bgAccent="bg-blue-600"
+              borderColor="#3b82f6"
             />
             <StatCard
               label="Whales"
               value={whaleAlerts.length}
               sub="Detected Anomaly"
               colorClass="text-red-400"
-              bgAccent="bg-red-500"
+              borderColor="#ef4444"
             />
           </div>
 
@@ -190,11 +223,10 @@ export default function DashboardPage() {
             <Sidebar />
           </div>
 
-          {/* ——— Whale Ticker (Bottom Edge inside frame) ——— */}
+          {/* ——— Whale Ticker (Bottom Edge) ——— */}
           <WhaleTicker />
         </div>
 
-      </div>
     </div>
   );
 }

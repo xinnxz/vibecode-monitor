@@ -3,6 +3,8 @@
 // components/layout/Navbar.tsx
 // ============================================================
 // Header utama SomniaScan — Clean, spacious Sci-Fi navigation.
+// NOTE: Using inline styles for spacing because Tailwind v4
+// @layer utilities have lower specificity than unlayered CSS.
 // ============================================================
 
 import { motion } from "framer-motion";
@@ -23,66 +25,93 @@ export function Navbar() {
   const pathname = usePathname();
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-      {/* 
-        Navbar inner container:
-        - py-6 = vertical breathing room
-        - px-12 = generous horizontal padding
-        - items-center = vertically aligned logo + nav
-      */}
-      <div className="flex items-center justify-between px-12 py-6">
+    <header
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "28px 48px",
+        pointerEvents: "none",
+      }}
+    >
+      {/* ——— LEFT: Logo ——— */}
+      <div style={{ pointerEvents: "auto", marginLeft: "16px", marginTop: "4px" }}>
+        <Link href="/" className="block">
+          <Image
+            src="/somnia-logo.png"
+            alt="SomniaScan Logo"
+            width={120}
+            height={50}
+            className="object-contain drop-shadow-md"
+            priority
+          />
+        </Link>
+      </div>
 
-        {/* ——— LEFT: Logo ——— */}
-        <div className="pointer-events-auto ml-4 mt-2">
-          <Link href="/" className="block">
-            <Image
-              src="/somnia-logo.png"
-              alt="SomniaScan Logo"
-              width={120}
-              height={50}
-              className="object-contain drop-shadow-md"
-              priority
-            />
-          </Link>
+      {/* ——— RIGHT: Navigation & Wallet ——— */}
+      <div
+        style={{
+          pointerEvents: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: "56px",
+          marginRight: "16px",
+        }}
+      >
+        {/* Nav Links */}
+        <nav style={{ display: "flex", alignItems: "center", gap: "48px" }}>
+          {NAV_LINKS.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                style={{
+                  position: "relative",
+                  padding: "4px 4px 12px 4px",
+                  fontSize: "14px",
+                  transition: "color 0.2s",
+                  color: isActive ? "white" : "rgba(255,255,255,0.5)",
+                  fontWeight: isActive ? 500 : 400,
+                  textDecoration: "none",
+                }}
+              >
+                {/* Active indicator — top line */}
+                {isActive && (
+                  <motion.div
+                    layoutId="active-nav-top"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: "3px",
+                      background: "#9D00FF",
+                      boxShadow: "0 0 12px #9D00FF",
+                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Wallet Pill — separated by a subtle divider */}
+        <div
+          style={{
+            paddingLeft: "24px",
+            borderLeft: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <WalletButton />
         </div>
-
-        {/* ——— RIGHT: Navigation & Wallet ——— */}
-        <div className="pointer-events-auto flex items-center gap-16">
-
-          {/* Nav Links — generous gap-16 for spacious feel */}
-          <nav className="flex items-center gap-14">
-            {NAV_LINKS.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`relative px-1 pt-1 pb-3 text-sm transition-colors ${
-                    isActive
-                      ? "text-white font-medium"
-                      : "text-white/50 hover:text-white/80"
-                  }`}
-                >
-                  {/* Active indicator — top line */}
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-nav-top"
-                      className="absolute top-0 left-0 right-0 h-[3px] bg-[#9D00FF] shadow-[0_0_12px_#9D00FF]"
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    />
-                  )}
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Wallet Pill — separated by a subtle divider */}
-          <div className="pl-8 border-l border-white/10">
-            <WalletButton />
-          </div>
-        </div>
-
       </div>
     </header>
   );
