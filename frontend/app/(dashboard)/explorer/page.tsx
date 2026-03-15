@@ -115,7 +115,7 @@ export default function ExplorerPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Latest Block", value: latestBlock ? `#${latestBlock.number.toLocaleString()}` : "—", color: "text-purple-400" },
-          { label: "Live TPS", value: tps > 0 ? `${tps}`, : "—", color: "text-cyan-400" },
+          { label: "Live TPS", value: tps > 0 ? `${tps}` : "—", color: "text-cyan-400" },
           { label: "Blocks Cached", value: recentBlocks.length.toString(), color: "text-emerald-400" },
           { label: "Last TX Count", value: latestBlock?.txCount.toString() ?? "—", color: "text-yellow-400" },
         ].map((stat) => (
