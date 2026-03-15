@@ -322,7 +322,7 @@ export function Sidebar() {
   return (
     <aside
       className="absolute z-40 pointer-events-none"
-      style={{ top: "96px", right: "40px", width: "320px" }}
+      style={{ top: "120px", right: "40px", width: "320px" }}
     >
       {/* Header */}
       <div style={{ padding: "0 4px 10px 4px" }}>

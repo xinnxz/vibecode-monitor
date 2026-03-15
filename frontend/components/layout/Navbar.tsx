@@ -104,15 +104,6 @@ function SciFiNavLink({ item, isActive }: { item: { href: string; label: string 
       >
         {displayText}
       </span>
-
-      {/* Active Top Bar Indicator */}
-      {isActive && (
-        <motion.div
-          layoutId="active-nav-top"
-          className="absolute top-0 left-0 right-0 h-[2px] bg-purple-500 shadow-[0_0_12px_#a855f7]"
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
     </Link>
   );
 }
