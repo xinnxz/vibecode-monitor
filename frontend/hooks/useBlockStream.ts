@@ -56,41 +56,41 @@ export function useBlockStream(): UseBlockStreamReturn {
   const blocksRef = useRef<ProcessedBlock[]>([]);
 
   // ——————————————————————————————————————————
-  // Smooth TPS Decay Logic (Sync visual Sidebar)
+  // Rolling Window TPS with Block-Gap Interpolation
+  // Somnia produces blocks faster than our RPC can poll.
+  // When we receive block #1000 after block #700, we know
+  // 300 blocks happened. We estimate total TX using the
+  // average TX/block from what we've seen.
   // ——————————————————————————————————————————
+  const txWindowRef = useRef<{ time: number; estimatedTx: number }[]>([]);
+  const lastSeenBlockRef = useRef<number>(0);
+  const avgTxPerBlockRef = useRef<number>(1.5); // Running average
+  const TPS_WINDOW_MS = 5000; // 5-second rolling window
+
+  const calculateRollingTPS = useCallback(() => {
+    const now = Date.now();
+    const cutoff = now - TPS_WINDOW_MS;
+
+    // Remove entries older than the window
+    txWindowRef.current = txWindowRef.current.filter(e => e.time >= cutoff);
+
+    // Sum all estimated TX in the window
+    const totalTx = txWindowRef.current.reduce((sum, e) => sum + e.estimatedTx, 0);
+
+    // Calculate TPS (total TX / window duration in seconds)
+    const windowSeconds = TPS_WINDOW_MS / 1000;
+    return Math.round(totalTx / windowSeconds);
+  }, []);
+
+  // Periodic TPS refresh & decay (updates even between block arrivals)
   useEffect(() => {
-    // Sidebar takes ~2-3s per slot to process a block visually.
-    // If the network drops to 0 instantly, we decay the TPS down slowly by 20% every 800ms
-    // so the number stays > 0 as long as the Sidebar is visibly busy processing the queue.
     const timer = setInterval(() => {
-      setTps(prev => {
-        const target = targetTpsRef.current;
-        if (prev <= target) return target; // Jump UP instantly handled by network block, but just in case
-        
-        // Smooth decay DOWN (simulating UI processing queue burning down)
-        const decayed = Math.max(target, Math.floor(prev * 0.85) - 1);
-        return decayed > 0 ? decayed : 0;
-      });
-    }, 800);
+      const currentTps = calculateRollingTPS();
+      targetTpsRef.current = currentTps;
+      setTps(currentTps);
+    }, 500); // Update 2x per second for smooth display
     return () => clearInterval(timer);
-  }, []);
-
-  // ——————————————————————————————————————————
-  // Hitung TPS dari N blok terakhir
-  // ——————————————————————————————————————————
-  const calculateTPS = useCallback((blocks: ProcessedBlock[]): number => {
-    if (blocks.length < 2) return 0;
-
-    // Ambil N blok terakhir untuk kalkulasi kecepatan instan
-    const window = blocks.slice(-3); // Gunakan window sangat kecil (3 blok) agar angka loncat agresif sesuai sidebar
-    if (window.length < 2) return 0;
-
-    const totalTx = window.reduce((sum, b) => sum + b.txCount, 0);
-    const timespan = window[window.length - 1].timestamp - window[0].timestamp;
-
-    if (timespan <= 0) return window[window.length - 1].txCount; // Fallback jika timestamp aneh
-    return Math.round(totalTx / timespan);
-  }, []);
+  }, [calculateRollingTPS]);
 
   // ——————————————————————————————————————————
   // Setup koneksi dan listener
@@ -129,13 +129,20 @@ export function useBlockStream(): UseBlockStreamReturn {
             // Update sliding window
             blocksRef.current = [...blocksRef.current, processed].slice(-MAX_BLOCKS);
 
+            // Record in rolling TPS window (wall-clock time!)
+            txWindowRef.current.push({
+              time: Date.now(),
+              estimatedTx: processed.txCount,
+            });
+
             if (mounted) {
               setLatestBlock(processed);
               setRecentBlocks([...blocksRef.current]);
               
-              const rawTps = calculateTPS(blocksRef.current);
+              // Immediately recalculate TPS on new block
+              const rawTps = calculateRollingTPS();
               targetTpsRef.current = rawTps;
-              setTps(prev => rawTps > prev ? rawTps : prev); // Spike UP instantly
+              setTps(rawTps);
             }
           } catch (err) {
             // Abaikan error per-blok (mungkin RPC timeout sesekali)
@@ -163,7 +170,7 @@ export function useBlockStream(): UseBlockStreamReturn {
         providerRef.current = null;
       }
     };
-  }, [calculateTPS]);
+  }, [calculateRollingTPS]);
 
   return { latestBlock, recentBlocks, tps, isConnected, error };
 }

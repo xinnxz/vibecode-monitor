@@ -1,81 +1,29 @@
 "use client";
 // components/globe/GlobeScene.tsx
+// ============================================================
+// Main 3D scene: Earth globe + live TX visualizations.
+// Uses useGlobeTxFeed for centralized data → visual mapping.
+// ============================================================
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Preload } from "@react-three/drei";
 
-import { EarthGlobe }        from "./EarthGlobe";
-import { SpaceEnvironment }  from "./SpaceEnvironment";
-import { NodePing }          from "./NodePing";
-import { FlyArc }            from "./FlyArc";
-import { WhalePulse }        from "./WhalePulse";
+import { EarthGlobe }       from "./EarthGlobe";
+import { SpaceEnvironment } from "./SpaceEnvironment";
+import { NodePing }         from "./NodePing";
+import { FlyArc }           from "./FlyArc";
+import { WhalePulse }       from "./WhalePulse";
+import { GlobePulseRing }   from "./GlobePulseRing";
+import { ImpactBurst }      from "./ImpactBurst";
 
-import { useBlockStream }    from "@/hooks/useBlockStream";
-import { useWhaleAlerts }    from "@/hooks/useWhaleAlerts";
-import { hashToLatLng }      from "@/lib/utils/geo";
-
-// ——— Tipe untuk animasi aktif ———
-interface ActivePing {
-  id: string; lat: number; lng: number; color: string;
-}
-interface ActiveArc {
-  id: string;
-  fromLat: number; fromLng: number;
-  toLat: number;   toLng: number;
-  color: string;
-}
-interface ActivePulse {
-  id: string; lat: number; lng: number;
-}
+import { useGlobeTxFeed }   from "@/hooks/useGlobeTxFeed";
 
 export function GlobeScene() {
-  const [pings, setPings]   = useState<ActivePing[]>([]);
-  const [arcs, setArcs]     = useState<ActiveArc[]>([]);
-  const [pulses, setPulses] = useState<ActivePulse[]>([]);
-
-  const { latestBlock } = useBlockStream();
-  const { latestAlert } = useWhaleAlerts();
-  const lastBlockRef    = useRef<number | null>(null);
-
-  // ——— Blok baru → spawn NodePing + FlyArc ———
-  useEffect(() => {
-    if (!latestBlock || latestBlock.number === lastBlockRef.current) return;
-    lastBlockRef.current = latestBlock.number;
-
-    const txs = latestBlock.transactions.slice(0, 8);
-    const ts  = Date.now();
-
-    const newPings: ActivePing[] = [];
-    const newArcs: ActiveArc[] = [];
-
-    txs.forEach((hash, i) => {
-      const from = hashToLatLng(hash);
-      const to   = hashToLatLng(hash.slice(0, 2) + hash.slice(4));
-      const id   = `${ts}-${i}`;
-
-      newPings.push({ id: `p-${id}`, lat: from.lat, lng: from.lng, color: "#9d00ff" });
-      newArcs.push({
-        id: `a-${id}`,
-        fromLat: from.lat, fromLng: from.lng,
-        toLat: to.lat, toLng: to.lng,
-        color: "#2e0094",
-      });
-    });
-
-    setPings((prev) => [...prev, ...newPings].slice(-40));
-    setArcs((prev) => [...prev, ...newArcs].slice(-30));
-  }, [latestBlock]);
-
-  // ——— Whale Alert → spawn WhalePulse ———
-  useEffect(() => {
-    if (!latestAlert) return;
-    const { lat, lng } = hashToLatLng(latestAlert.from);
-    setPulses((prev) => [
-      ...prev.filter((p) => p.id !== `pulse-${latestAlert.id}`),
-      { id: `pulse-${latestAlert.id}`, lat, lng },
-    ]);
-  }, [latestAlert]);
+  const {
+    pings, arcs, bursts, pulses, flashes,
+    removePing, removeArc, removeBurst, removePulse, removeFlash,
+  } = useGlobeTxFeed();
 
   return (
     <Canvas
@@ -94,50 +42,74 @@ export function GlobeScene() {
       }}
       style={{ background: "#010204" }}
     >
-      {/* Suspense WAJIB untuk useLoader di EarthGlobe / SpaceEnvironment */}
       <Suspense fallback={null}>
-        {/* ——— Space: nebula skybox, moon, bintang, lighting ——— */}
+        {/* ——— Space: nebula skybox, moon, stars, lighting ——— */}
         <SpaceEnvironment />
 
-        {/* ——— Bumi ——— */}
+        {/* ——— Earth ——— */}
         <EarthGlobe />
 
-        {/* ——— Node pings per tx ——— */}
+        {/* ——— Globe Pulse Rings (block arrival sonar) ——— */}
+        {flashes.map((f) => (
+          <GlobePulseRing
+            key={f.id}
+            color={f.color}
+            onDone={() => removeFlash(f.id)}
+          />
+        ))}
+
+        {/* ——— Node Pings (TX origin markers) ——— */}
         {pings.map((p) => (
           <NodePing
             key={p.id}
             lat={p.lat}
             lng={p.lng}
             color={p.color}
-            onDone={() => setPings((prev) => prev.filter((x) => x.id !== p.id))}
+            size={p.size}
+            onDone={() => removePing(p.id)}
           />
         ))}
 
-        {/* ——— Laser arcs per tx ——— */}
+        {/* ——— Laser Arcs (TX flight paths) ——— */}
         {arcs.map((a) => (
           <FlyArc
             key={a.id}
-            fromLat={a.fromLat} fromLng={a.fromLng}
-            toLat={a.toLat}     toLng={a.toLng}
+            fromLat={a.fromLat}
+            fromLng={a.fromLng}
+            toLat={a.toLat}
+            toLng={a.toLng}
             color={a.color}
-            onDone={() => setArcs((prev) => prev.filter((x) => x.id !== a.id))}
+            speed={a.speed}
+            intensity={a.intensity}
+            onDone={() => removeArc(a.id)}
           />
         ))}
 
-        {/* ——— Whale Pulses ——— */}
+        {/* ——— Impact Bursts (TX landing particle explosions) ——— */}
+        {bursts.map((b) => (
+          <ImpactBurst
+            key={b.id}
+            lat={b.lat}
+            lng={b.lng}
+            color={b.color}
+            onDone={() => removeBurst(b.id)}
+          />
+        ))}
+
+        {/* ——— Whale Pulses (large TX indicators) ——— */}
         {pulses.map((p) => (
           <WhalePulse
             key={p.id}
             lat={p.lat}
             lng={p.lng}
-            onDone={() => setPulses((prev) => prev.filter((x) => x.id !== p.id))}
+            onDone={() => removePulse(p.id)}
           />
         ))}
 
         <Preload all />
       </Suspense>
 
-      {/* OrbitControls harus di luar Suspense */}
+      {/* OrbitControls must be outside Suspense */}
       <OrbitControls
         enableDamping
         dampingFactor={0.05}
@@ -150,4 +122,3 @@ export function GlobeScene() {
     </Canvas>
   );
 }
-

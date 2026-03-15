@@ -227,8 +227,15 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
 
 
   return (
+    <a
+      href={`https://shannon-explorer.somnia.network/block/${block.number}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block group/block"
+      style={{ textDecoration: "none" }}
+    >
     <div
-      className="relative pointer-events-auto"
+      className="relative pointer-events-auto transition-all duration-200 cursor-pointer group-hover/block:brightness-125"
       style={{
         padding: "10px 14px",
         background: flash ? "rgba(168, 85, 247, 0.2)" : "rgba(168, 85, 247, 0.06)",
@@ -259,11 +266,12 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
         </div>
       </div>
     </div>
+    </a>
   );
 }
 
 export function Sidebar() {
-  const { recentBlocks, tps: trueNetworkTps } = useBlockStream();
+  const { recentBlocks, tps } = useBlockStream();
 
   // Shared state manager for all slots
   const queueManager = useRef<QueueManager>({
@@ -273,19 +281,30 @@ export function Sidebar() {
     totalProcessedHits: 0,
   });
 
+  // Push real on-chain TPS to Zustand store so page.tsx can read it
+  // without needing its own duplicate RPC connection
+  useEffect(() => {
+    useTpsStore.getState().setChainTps(tps);
+  }, [tps]);
+
   // Share the currently displayed TPS visually backwards
   useEffect(() => {
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
-      // Use the true network TPS instead of multiplying visual card data
-      const visualTps = trueNetworkTps;
+      let totalVisibleTx = 0;
+      queueManager.current.currentlyDisplaying.forEach((txCount) => {
+        totalVisibleTx += txCount;
+      });
+
+      // Calculate absolute real-time visible transactions (since lock duration is so fast now ~350ms)
+      const visualTps = totalVisibleTx;
 
       if (visualTps !== lastEmitted) {
         useTpsStore.getState().setVisualTps(visualTps);
         lastEmitted = visualTps;
       }
-    }, 1000); // Update stat card once per second so it's readable, not flickering
+    }, 400); // Poll 2.5 times a second
     return () => clearInterval(interval);
   }, []);
 

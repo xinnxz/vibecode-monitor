@@ -166,10 +166,8 @@ function SciFiButtonCore({
   );
 }
 
-export function WalletButton() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  
+// Inner component that uses wagmi hooks — only rendered after hydration
+function WalletButtonInner() {
   const {
     shortAddress,
     isConnected,
@@ -180,10 +178,6 @@ export function WalletButton() {
     disconnectWallet,
     switchToSomnia,
   } = useWallet();
-
-  if (!mounted) {
-    return <SciFiButtonCore label="SYNCING..." disabled />;
-  }
 
   if (isConnecting) {
     return <SciFiButtonCore label="CONNECTING..." baseColor="purple" isConnecting showDot />;
@@ -207,18 +201,20 @@ export function WalletButton() {
         label={shortAddress} 
         baseColor="emerald" 
         showDot
-        onClick={() => {}} // Usually copying to clipboard 
+        onClick={() => {}} 
         rightNode={
           <motion.button
             whileHover={{ scale: 1.1, backgroundColor: "rgba(239, 68, 68, 0.15)" }}
             whileTap={{ scale: 0.9 }}
             onClick={disconnectWallet}
-            className="flex items-center justify-center w-10 h-[40px] border border-white/5 bg-black/40 backdrop-blur-md text-white/40 hover:text-red-400 hover:border-red-500/30 transition-all rounded-[2px]"
+            className="text-red-400/70 hover:text-red-400 rounded-sm p-1 transition-colors"
+            style={{ clipPath: "polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)", border: "1px solid rgba(239,68,68,0.3)" }}
             title="Disconnect"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-              <line x1="12" y1="2" x2="12" y2="12"></line>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
           </motion.button>
         }
@@ -226,17 +222,17 @@ export function WalletButton() {
     );
   }
 
-  return (
-    <SciFiButtonCore 
-      label="CONNECT WALLET" 
-      baseColor="purple" 
-      onClick={connectWallet}
-      icon={
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
-          <circle cx="16" cy="12" r="1"/>
-        </svg>
-      }
-    />
-  );
+  return <SciFiButtonCore label="CONNECT WALLET" onClick={connectWallet} />;
+}
+
+// Outer shell: manages hydration safety. Wagmi hooks only fire once mounted.
+export function WalletButton() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  
+  if (!mounted) {
+    return <SciFiButtonCore label="CONNECT WALLET" disabled />;
+  }
+
+  return <WalletButtonInner />;
 }

@@ -6,7 +6,7 @@
 // Redesigned with premium Glassmorphism & Cyberpunk aesthetics.
 // ============================================================
 
-import { useBlockStream } from "@/hooks/useBlockStream";
+// TPS data is shared via Zustand store from Sidebar's single RPC connection
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { useNetworkStats } from "@/hooks/useNetworkStats";
 import { useTpsStore } from "@/hooks/useTpsStore";
@@ -172,10 +172,10 @@ function WhaleTicker() {
 
 // ——— Main Page ———
 export default function DashboardPage() {
-  const { tps } = useBlockStream();
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
-  const visualTps = useTpsStore((state) => state.visualTps);
+  // Read real on-chain TPS from Zustand store (pushed by Sidebar's useBlockStream)
+  const chainTps = useTpsStore((state) => state.chainTps);
 
   return (
     <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
@@ -189,9 +189,9 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center gap-2" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
           <span className="text-[10px] font-mono tracking-widest text-white/50 uppercase">Network Status</span>
           <div className="flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${tps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
-            <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${tps > 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {tps > 0 ? "ONLINE" : "OFFLINE"}
+            <span className={`w-1.5 h-1.5 rounded-full ${chainTps > 0 ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500"}`} />
+            <span className={`text-[11px] font-bold tracking-[0.2em] font-mono ${chainTps > 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {chainTps > 0 ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
         </div>
@@ -221,11 +221,11 @@ export default function DashboardPage() {
           <StatCard
             label="Active TX"
             value={
-              visualTps > 0 
-                ? <span className="flex items-baseline gap-1">{visualTps}<span className="text-sm opacity-50">/s</span></span> 
+              chainTps > 0
+                ? <span className="flex items-baseline gap-1">{chainTps}<span className="text-[10px] opacity-40">/s</span></span>
                 : "—"
             }
-            sub="Transactions"
+            sub="On-Chain TX"
             colorClass="text-indigo-400"
             borderColor="#818cf8"
           />
