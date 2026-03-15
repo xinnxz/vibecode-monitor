@@ -1,13 +1,12 @@
 "use client";
 // hooks/useGlobeTxFeed.ts
 // ============================================================
-// Hub Routing Pattern — HIGH DENSITY MODE:
-// - Syncs with sidebar: every block fires up to 20 arcs
-// - Ambient arcs: every 2.5s if no new block, reuse recent hashes (sidebar-style)
-// - Arc speed very slow (0.08-0.18) so many arcs overlap simultaneously
-// - Ghost arcs: after arriving, path stays faded for 10s before removing
-// - Normal TX → random city → Somnia Hub (cyan/purple)
-// - Whale TX → Hub → random city outbound (gold)
+// EXACT SYNC MODE:
+//   - Arc count = EXACT txCount from each block (no padding!)
+//   - Every TX in sidebar → exactly 1 arc on globe
+//   - Ghost trails persist so globe stays visually busy
+//   - Whale TX → outbound arc from hub
+//   - No fake ambient arcs — only real data
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -18,9 +17,9 @@ import { HUB_LAT, HUB_LNG } from "@/components/globe/SomniaHub";
 
 // ——— Color System ———
 function getArcColor(txCount: number): string {
-  if (txCount >= 10) return "#f59e0b";
-  if (txCount >= 3)  return "#a855f7";
-  return "#22d3ee";
+  if (txCount >= 10) return "#f59e0b"; // gold
+  if (txCount >= 3)  return "#a855f7"; // purple
+  return "#22d3ee";                    // cyan
 }
 function getIntensity(txCount: number): number {
   if (txCount >= 10) return 0.9;
@@ -49,9 +48,6 @@ export interface ActiveRipple {
   id: string; color: string;
 }
 
-// Pool of recent hashes to reuse for ambient arcs (sidebar-style reuse)
-const hashPool: string[] = [];
-
 export function useGlobeTxFeed() {
   const [pings,   setPings]   = useState<ActivePing[]>([]);
   const [arcs,    setArcs]    = useState<ActiveArc[]>([]);
@@ -60,102 +56,63 @@ export function useGlobeTxFeed() {
   const [ripples, setRipples] = useState<ActiveRipple[]>([]);
   const [hubFlash, setHubFlash] = useState(false);
 
-  const { latestBlock, recentBlocks, tps } = useBlockStream();
+  const { latestBlock, tps } = useBlockStream();
   const { latestAlert } = useWhaleAlerts();
   const lastBlockRef = useRef<number | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ambientTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Helper to build arcs from a list of tx hashes
-  const buildArcsFromHashes = useCallback((
-    hashes: string[], txCount: number, ts: number, limit = 20
-  ) => {
-    const color = getArcColor(txCount);
-    const intensity = getIntensity(txCount);
-    const newPings: ActivePing[] = [];
-    const newArcs: ActiveArc[] = [];
-
-    hashes.slice(0, limit).forEach((hash, i) => {
-      const from = hashToLatLng(hash);
-      const id = `${ts}-${i}`;
-      newPings.push({
-        id: `p-${id}`, lat: from.lat, lng: from.lng,
-        color, size: 0.4 + intensity * 0.6,
-      });
-      newArcs.push({
-        id: `a-${id}`,
-        fromLat: from.lat, fromLng: from.lng,
-        toLat: HUB_LAT, toLng: HUB_LNG,
-        color,
-        // Very slow speed = more arcs visible simultaneously
-        speed: 0.08 + intensity * 0.08 + Math.random() * 0.04,
-        intensity,
-      });
-    });
-    return { newPings, newArcs, color };
-  }, []);
-
-  // ——— New block → fire HIGH DENSITY arcs to hub ———
+  // ——— New block → EXACT number of arcs matching txCount ———
   useEffect(() => {
     if (!latestBlock || latestBlock.number === lastBlockRef.current) return;
     lastBlockRef.current = latestBlock.number;
 
     const ts = Date.now();
     const txCount = latestBlock.txCount;
+    const color = getArcColor(txCount);
+    const intensity = getIntensity(txCount);
 
-    // Add to hash pool for ambient reuse (sidebar-style)
-    latestBlock.transactions.forEach(h => {
-      hashPool.push(h);
-      if (hashPool.length > 200) hashPool.shift();
+    // EXACT: 1 arc per TX — no padding, no fakes
+    const txHashes = latestBlock.transactions;
+    const newPings: ActivePing[] = [];
+    const newArcs: ActiveArc[] = [];
+
+    txHashes.forEach((hash, i) => {
+      const from = hashToLatLng(hash);
+      const id = `${ts}-${i}`;
+
+      newPings.push({
+        id: `p-${id}`,
+        lat: from.lat,
+        lng: from.lng,
+        color,
+        size: 0.4 + intensity * 0.6,
+      });
+
+      newArcs.push({
+        id: `a-${id}`,
+        fromLat: from.lat,
+        fromLng: from.lng,
+        toLat: HUB_LAT,
+        toLng: HUB_LNG,
+        color,
+        // Speed: slow enough to see, with slight randomness
+        speed: 0.10 + intensity * 0.06 + Math.random() * 0.04,
+        intensity,
+      });
     });
 
-    // Build arcs — use ALL tx hashes + pad with shifted variants to reach 20
-    const baseHashes = latestBlock.transactions.slice(0, 20);
-    // Pad to 20 with hash variants (same trick as sidebar recycle)
-    const padded = [...baseHashes];
-    while (padded.length < 12 && baseHashes.length > 0) {
-      const h = baseHashes[padded.length % baseHashes.length];
-      padded.push(h.slice(0, 32) + padded.length.toString(16).padStart(10, "0"));
-    }
+    // Ghost trails make old arcs persist — so we allow high limits
+    setPings(prev => [...prev, ...newPings].slice(-100));
+    setArcs(prev => [...prev, ...newArcs].slice(-150));
 
-    const { newPings, newArcs, color } = buildArcsFromHashes(padded, txCount, ts, 20);
-
-    setPings(prev => [...prev, ...newPings].slice(-80));
-    setArcs(prev => [...prev, ...newArcs].slice(-120));
-
-    // Hub flash on every block
+    // Flash hub
     setHubFlash(true);
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     flashTimerRef.current = setTimeout(() => setHubFlash(false), 250);
 
-  }, [latestBlock, buildArcsFromHashes]);
+  }, [latestBlock]);
 
-  // ——— Ambient arcs every 2.5s — reuse sidebar hash pool ———
-  useEffect(() => {
-    ambientTimerRef.current = setInterval(() => {
-      if (hashPool.length < 3) return;
-      const ts = Date.now();
-      // Pick 4–6 random hashes from pool
-      const count = 4 + Math.floor(Math.random() * 3);
-      const picked: string[] = [];
-      for (let i = 0; i < count; i++) {
-        picked.push(hashPool[Math.floor(Math.random() * hashPool.length)]);
-      }
-      const { newPings, newArcs } = buildArcsFromHashes(picked, 1, ts, count);
-      // Ambient arcs are reused — make them faint
-      const faintArcs = newArcs.map(a => ({ ...a, intensity: a.intensity * 0.4, color: "#22d3ee" }));
-      const faintPings = newPings.map(p => ({ ...p, size: p.size * 0.5 }));
-
-      setPings(prev => [...prev, ...faintPings].slice(-80));
-      setArcs(prev => [...prev, ...faintArcs].slice(-120));
-    }, 2500);
-
-    return () => {
-      if (ambientTimerRef.current) clearInterval(ambientTimerRef.current);
-    };
-  }, [buildArcsFromHashes]);
-
-  // ——— Whale Alert → outbound arc from hub → destination (gold) ———
+  // ——— Whale Alert → outbound arc from hub (gold) ———
   useEffect(() => {
     if (!latestAlert) return;
     const to = hashToLatLng(latestAlert.from);
@@ -171,7 +128,7 @@ export function useGlobeTxFeed() {
       fromLat: HUB_LAT, fromLng: HUB_LNG,
       toLat: to.lat, toLng: to.lng,
       color: "#f59e0b", speed: 0.12, intensity: 1.0, isWhale: true,
-    }].slice(-120));
+    }].slice(-150));
 
     setBursts(prev => [...prev, {
       id: `wb-${ts}`, lat: to.lat, lng: to.lng, color: "#ef4444",
@@ -180,13 +137,13 @@ export function useGlobeTxFeed() {
   }, [latestAlert]);
 
   // ——— Remove callbacks ———
-  const removePing  = useCallback((id: string) => setPings(p => p.filter(x => x.id !== id)), []);
-  const removeArc   = useCallback((id: string) => setArcs(p => p.filter(x => x.id !== id)), []);
-  const removeBurst = useCallback((id: string) => setBursts(p => p.filter(x => x.id !== id)), []);
-  const removePulse = useCallback((id: string) => setPulses(p => p.filter(x => x.id !== id)), []);
-  const removeRipple= useCallback((id: string) => setRipples(p => p.filter(x => x.id !== id)), []);
+  const removePing   = useCallback((id: string) => setPings(p => p.filter(x => x.id !== id)), []);
+  const removeArc    = useCallback((id: string) => setArcs(p => p.filter(x => x.id !== id)), []);
+  const removeBurst  = useCallback((id: string) => setBursts(p => p.filter(x => x.id !== id)), []);
+  const removePulse  = useCallback((id: string) => setPulses(p => p.filter(x => x.id !== id)), []);
+  const removeRipple = useCallback((id: string) => setRipples(p => p.filter(x => x.id !== id)), []);
 
-  // Arc landing → hub ripple (for non-whale arcs landing at hub)
+  // Arc landing at hub → hub ripple
   const onArcLanded = useCallback((arcId: string, isWhale: boolean) => {
     removeArc(arcId);
     if (!isWhale) {

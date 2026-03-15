@@ -155,18 +155,7 @@ export function SpaceEnvironment() {
         <meshBasicMaterial map={skyTexture} side={THREE.BackSide} />
       </mesh>
 
-      {/* ——— Moon ——— */}
-      <mesh ref={moonRef} position={[150, 70, -100]}>
-        <sphereGeometry args={[R * 0.3, 64, 64]} />
-        <meshStandardMaterial
-          map={moonTex}
-          roughness={0.45}
-          metalness={0.4}
-          color={0xffffff}
-          emissive={new THREE.Color(0x0a1526)}
-          emissiveIntensity={0.8}
-        />
-      </mesh>
+      {/* Moon removed — now orbits in EarthGlobe.tsx */}
 
       {/* ——— 3D Star particles (multi-color) ——— */}
       <points ref={starsRef}>

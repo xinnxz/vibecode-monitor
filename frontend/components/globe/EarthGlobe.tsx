@@ -1,43 +1,47 @@
 "use client";
 // components/globe/EarthGlobe.tsx
 // ============================================================
-// Port dari globe.js Vibe Code Monitor ke React Three Fiber.
+// Earth Globe + Keplerian Lunar Orbit
 //
-// Komponen ini menghasilkan bola bumi persis seperti referensi:
+// Features:
 // 1. Earth sphere + earth.jpg texture + GLSL shader (Fresnel glow + scan line)
-// 2. Point border (titik-titik kecil transparan mengelilingi bumi)
-// 3. Atmospheric glow sprite (glow.png overlay)
-// 4. Fresnel atmosphere shader (cahaya di tepi bola)
-// 5. 3 Satellite orbit rings + rotating dots
+// 2. Point border (titik-titik transparan mengelilingi bumi)
+// 3. Atmospheric glow sprite + Fresnel atmosphere shader
+// 4. Moon orbiting Earth on Keplerian elliptical orbit:
+//    - e = 0.0549 (Moon's actual eccentricity)
+//    - i = 5.145° (Moon's orbital inclination)
+//    - Kepler's equation solved via Newton-Raphson
+//    - Period = 120s (accelerated for visual effect)
 // ============================================================
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { earthRotationRef } from "./SomniaHub";
 
-const R = 50; // Radius bumi — sama dengan referensi
+const R = 50;
 
 export function EarthGlobe() {
   const earthRef = useRef<THREE.Group>(null!);
-  const scanTimeRef = useRef(100); // Untuk animasi scan line
+  const moonRef = useRef<THREE.Mesh>(null!);
+  const scanTimeRef = useRef(100);
 
-  // ——— Load semua textures ———
+  // ——— Load textures ———
   const earthTex = useLoader(THREE.TextureLoader, "/textures/earth.jpg");
-  const glowTex  = useLoader(THREE.TextureLoader, "/textures/glow.png");
+  const glowTex = useLoader(THREE.TextureLoader, "/textures/glow.png");
+  const moonTex = useLoader(THREE.TextureLoader, "/textures/moon.jpg");
 
   // ——— GLSL Shader Uniforms ———
   const uniforms = useMemo(() => ({
-    glowColor: { value: new THREE.Color(0x4b0082) }, // Dark Purple for base terrain glow
-    scale:     { value: -1.0 },
-    bias:      { value: 1.0 },
-    power:     { value: 3.3 },
-    time:      { value: 100.0 },
-    isHover:   { value: false },
-    map:       { value: earthTex },
+    glowColor: { value: new THREE.Color(0x4b0082) },
+    scale: { value: -1.0 },
+    bias: { value: 1.0 },
+    power: { value: 3.3 },
+    time: { value: 100.0 },
+    isHover: { value: false },
+    map: { value: earthTex },
   }), [earthTex]);
 
-  // ——— Vertex Shader ———
   const vertexShader = `
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -52,7 +56,6 @@ export function EarthGlobe() {
     }
   `;
 
-  // ——— Fragment Shader: Fresnel glow + moving scan line + earth texture ———
   const fragmentShader = `
     uniform vec3 glowColor;
     uniform float bias;
@@ -66,24 +69,16 @@ export function EarthGlobe() {
     varying vec2 vUv;
 
     void main(void) {
-      // Fresnel glow: tepi bumi lebih terang (efek atmosphere)
       float a = pow(bias + scale * abs(dot(vNormal, vPositionNormal)), power);
-
-      // Scan line: garis cahaya bergerak vertikal dari bawah ke atas
       if (vp.y > time && vp.y < time + 20.0) {
         float t = smoothstep(0.0, 0.8, (1.0 - abs(0.5 - (vp.y - time) / 20.0)) / 3.0);
         gl_FragColor = mix(gl_FragColor, vec4(glowColor, 1.0), t * t);
       }
-
-      // Apply Fresnel glow
       gl_FragColor = mix(gl_FragColor, vec4(glowColor, 1.0), a);
-
-      // Tambahkan earth texture di atas semua efek
       gl_FragColor = gl_FragColor + texture2D(map, vUv);
     }
   `;
 
-  // ——— Atmosphere Fresnel Shader ———
   const atmoVertexShader = `
     varying vec3 vVertexWorldPosition;
     varying vec3 vVertexNormal;
@@ -108,92 +103,130 @@ export function EarthGlobe() {
     }
   `;
 
-  // ——— Satellite orbit ring points ———
-  const orbitPoints = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    for (let j = 0; j < 2 * Math.PI - 0.1; j += (2 * Math.PI) / 150) {
-      pts.push(new THREE.Vector3(
-        Math.cos(j) * (R + 15),
-        0,
-        Math.sin(j) * (R + 15)
-      ));
+  // ============================================================
+  // KEPLERIAN LUNAR ORBIT — Real Physics
+  // ============================================================
+  const ORBIT_A = R + 35;                        // Semi-major axis (scaled)
+  const ORBIT_E = 0.0549;                        // Moon's actual eccentricity
+  const ORBIT_I = 5.145 * Math.PI / 180;         // Orbital inclination (rad)
+  const ORBIT_PERIOD = 120;                       // Period in seconds (visual)
+  const orbitTimeRef = useRef(Math.random() * ORBIT_PERIOD);
+
+  // Solve Kepler's Equation: M = E - e·sin(E) → find E
+  // Uses Newton-Raphson iteration (converges in ~4 steps for e < 0.1)
+  function solveKepler(M: number, e: number): number {
+    let E = M; // Initial guess (good for low eccentricity)
+    for (let i = 0; i < 6; i++) {
+      E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
     }
-    pts.push(pts[0].clone());
-    return pts;
+    return E;
+  }
+
+  // Calculate moon position at given time using Kepler's laws
+  function getMoonPos(t: number): [number, number, number] {
+    // Mean anomaly (increases uniformly with time)
+    const M = (2 * Math.PI * t) / ORBIT_PERIOD;
+
+    // Eccentric anomaly (via Kepler's equation — non-uniform!)
+    const E = solveKepler(M, ORBIT_E);
+
+    // True anomaly: the ACTUAL angle of the moon around its orbit
+    // Moon moves faster at perigee (closest), slower at apogee (farthest)
+    const nu = 2 * Math.atan2(
+      Math.sqrt(1 + ORBIT_E) * Math.sin(E / 2),
+      Math.sqrt(1 - ORBIT_E) * Math.cos(E / 2)
+    );
+
+    // Orbital radius (distance from Earth center = focus of ellipse)
+    // r = a(1 - e·cos(E))  — not uniform! Changes with position
+    const r = ORBIT_A * (1 - ORBIT_E * Math.cos(E));
+
+    // Position in orbital plane (flat ellipse in XZ)
+    const xFlat = r * Math.cos(nu);
+    const zFlat = r * Math.sin(nu);
+
+    // Apply orbital inclination: rotate around X-axis by i
+    // This tilts the orbit 5.145° out of the equatorial plane
+    const x = xFlat;
+    const y = zFlat * Math.sin(ORBIT_I);
+    const z = zFlat * Math.cos(ORBIT_I);
+
+    return [x, y, z];
+  }
+
+  // Pre-compute elliptical orbit trail for the visible ring
+  const orbitTrailGeo = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const steps = 200;
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * ORBIT_PERIOD;
+      const M = (2 * Math.PI * t) / ORBIT_PERIOD;
+      let E = M;
+      for (let j = 0; j < 6; j++) E = E - (E - ORBIT_E * Math.sin(E) - M) / (1 - ORBIT_E * Math.cos(E));
+      const nu = 2 * Math.atan2(
+        Math.sqrt(1 + ORBIT_E) * Math.sin(E / 2),
+        Math.sqrt(1 - ORBIT_E) * Math.cos(E / 2)
+      );
+      const r = ORBIT_A * (1 - ORBIT_E * Math.cos(E));
+      const xF = r * Math.cos(nu);
+      const zF = r * Math.sin(nu);
+      pts.push(new THREE.Vector3(xF, zF * Math.sin(ORBIT_I), zF * Math.cos(ORBIT_I)));
+    }
+    const curve = new THREE.CatmullRomCurve3(pts, true);
+    return new THREE.TubeGeometry(curve, 200, 0.12);
   }, []);
 
-  // ——— Create satellite ring tube geometry ———
-  const orbitGeo = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3(orbitPoints);
-    return new THREE.TubeGeometry(curve, 100, 0.1);
-  }, [orbitPoints]);
-
-  // ——— Satellite balls positions ———
-  const satPositions = useMemo(() => {
-    const positions: THREE.Vector3[][] = [];
-    for (let ring = 0; ring < 3; ring++) {
-      const ringPts: THREE.Vector3[] = [];
-      for (let i = 0; i < 2; i++) {
-        const idx = Math.floor(orbitPoints.length / 2) * (i + 1);
-        const pos = orbitPoints[idx % orbitPoints.length];
-        ringPts.push(pos.clone());
-      }
-      positions.push(ringPts);
-    }
-    return positions;
-  }, [orbitPoints]);
-
-  // ——— Animate scan line + earth rotation ———
+  // ——— Animation Loop ———
   useFrame((_, delta) => {
-    // Scan line: bergerak dari bawah ke atas
+    // Scan line
     scanTimeRef.current -= delta * 15;
     if (scanTimeRef.current < -R - 20) scanTimeRef.current = R + 20;
     uniforms.time.value = scanTimeRef.current;
 
-    // Rotasi bumi
+    // Earth rotation
     if (earthRef.current) {
       earthRef.current.rotation.y += delta * 0.04;
-      earthRotationRef.y = earthRef.current.rotation.y; // Share rotation with SomniaHub
+      earthRotationRef.y = earthRef.current.rotation.y;
+    }
+
+    // Moon: advance along Kepler orbit
+    orbitTimeRef.current = (orbitTimeRef.current + delta) % ORBIT_PERIOD;
+    if (moonRef.current) {
+      const [mx, my, mz] = getMoonPos(orbitTimeRef.current);
+      moonRef.current.position.set(mx, my, mz);
+      // Tidally locked: one face always toward Earth (like the real Moon)
+      moonRef.current.lookAt(0, 0, 0);
     }
   });
 
-  // Ring colors representing Somnia Theme
-  // Only ring 3 (outermost, scale 0.8x) kept — rings 1 & 2 removed
-  const outerRingColor = 0x4b0082;
-  const outerBallColor = 0xffffff;
-
   return (
     <group ref={earthRef}>
-      {/* ——— 1. Point border (titik transparan di sekitar bumi) ——— */}
+      {/* ——— 1. Point border ——— */}
       <points>
         <sphereGeometry args={[R + 10, 60, 60]} />
         <pointsMaterial
-          color={0x2e0094} // Indigo Blue for border points
+          color={0x2e0094}
           transparent
           sizeAttenuation
-          opacity={0.1}
-          size={0.01}
+          opacity={0.25}
+          size={0.04}
         />
       </points>
 
-      {/* ——— 2. Earth sphere dengan custom GLSL shader ——— */}
+      {/* ——— 2. Earth sphere ——— */}
       <mesh>
         <sphereGeometry args={[R, 50, 50]} />
-        <shaderMaterial
-          uniforms={uniforms}
-          vertexShader={vertexShader}
-          fragmentShader={fragmentShader}
-        />
+        <shaderMaterial uniforms={uniforms} vertexShader={vertexShader} fragmentShader={fragmentShader} />
       </mesh>
 
-      {/* ——— 3. Atmosphere Fresnel glow (inner) ——— */}
+      {/* ——— 3. Atmosphere Fresnel glow ——— */}
       <mesh>
         <sphereGeometry args={[R, 50, 50]} />
         <shaderMaterial
           uniforms={{
             coeficient: { value: 1.0 },
-            power:      { value: 3 },
-            glowColor:  { value: new THREE.Color(0x4b0082) }, // Dark Purple for inner atmosphere
+            power: { value: 3 },
+            glowColor: { value: new THREE.Color(0x4b0082) },
           }}
           vertexShader={atmoVertexShader}
           fragmentShader={atmoFragmentShader}
@@ -203,29 +236,28 @@ export function EarthGlobe() {
         />
       </mesh>
 
-      {/* ——— 4. Glow sprite overlay ——— */}
+      {/* ——— 4. Glow sprite ——— */}
       <sprite scale={[R * 3.0, R * 3.0, 1]}>
-        <spriteMaterial
-          map={glowTex}
-          color={0x1a0033} // Very deep, dark indigo for the huge sprite glow
-          transparent
-          opacity={0.4} // Lowered opacity so it's not washed out
-          depthWrite={false}
-        />
+        <spriteMaterial map={glowTex} color={0x1a0033} transparent opacity={0.4} depthWrite={false} />
       </sprite>
 
-      {/* ——— 5. Outermost satellite ring only (rings 1+2 removed) ——— */}
-      <mesh geometry={orbitGeo} scale={[0.8, 0.8, 0.8]} rotation={[0, 0, -Math.PI / 6]}>
-        <meshBasicMaterial color={outerRingColor} transparent opacity={0.35} side={THREE.DoubleSide} />
+      {/* ——— 5. Lunar orbit trail (Keplerian ellipse with 5.145° tilt) ——— */}
+      <mesh geometry={orbitTrailGeo}>
+        <meshBasicMaterial color={0x4b0082} transparent opacity={0.2} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* ——— 6. Satellite ball on outermost ring ——— */}
-      {satPositions[2]?.map((pos, i) => (
-        <mesh key={`sat-outer-${i}`} position={[pos.x * 0.8, pos.y * 0.8, pos.z * 0.8]}>
-          <sphereGeometry args={[1, 16, 16]} />
-          <meshBasicMaterial color={outerBallColor} />
-        </mesh>
-      ))}
+      {/* ——— 6. Moon (travels along Keplerian orbit) ——— */}
+      <mesh ref={moonRef}>
+        <sphereGeometry args={[R * 0.18, 32, 32]} />
+        <meshStandardMaterial
+          map={moonTex}
+          roughness={0.45}
+          metalness={0.4}
+          color={0xffffff}
+          emissive={new THREE.Color(0x0a1526)}
+          emissiveIntensity={0.8}
+        />
+      </mesh>
     </group>
   );
 }
