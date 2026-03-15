@@ -219,7 +219,7 @@ export function FlyArc({
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const mat = new THREE.PointsMaterial({
-      size: 0.8 + intensity * 0.4, // Massively reduced from 2.8+ to prevent fat white arrows
+      size: 1.2 + intensity * 0.4, // Massively reduced from 2.8+ to prevent fat white arrows
       transparent: true,
       opacity: 0.85,
       depthWrite: false,

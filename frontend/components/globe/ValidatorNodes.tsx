@@ -3,17 +3,17 @@ import { useRef, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { latLngToXYZ } from "@/lib/utils/geo";
-import { earthRotationRef, HUB_LAT, HUB_LNG } from "./SomniaHub";
+import { HUB_LAT, HUB_LNG } from "./SomniaHub";
 
 const R = 50;
 
 // Coordinates for the 5 Regional Validators
 export const VALIDATORS = [
-  { id: "nyc",  lat: 40.7128,  lng: -74.0060, color: 0x3b82f6 }, // Blue (NYC)
-  { id: "fra",  lat: 50.1109,  lng: 8.6821,   color: 0x10b981 }, // Green (Frankfurt)
-  { id: "nrt",  lat: 35.6762,  lng: 139.6503, color: 0xf59e0b }, // Orange (Tokyo)
-  { id: "sp",   lat: -23.5505, lng: -46.6333, color: 0xef4444 }, // Red (São Paulo)
-  { id: "dxb",  lat: 25.2048,  lng: 55.2708,  color: 0x06b6d4 }  // Cyan (Dubai)
+  { id: "nyc", lat: 40.7128, lng: -74.0060, color: 0x3b82f6 }, // Blue (NYC)
+  { id: "fra", lat: 50.1109, lng: 8.6821, color: 0x10b981 }, // Green (Frankfurt)
+  { id: "nrt", lat: 35.6762, lng: 139.6503, color: 0xf59e0b }, // Orange (Tokyo)
+  { id: "sp", lat: -23.5505, lng: -46.6333, color: 0xef4444 }, // Red (São Paulo)
+  { id: "dxb", lat: 25.2048, lng: 55.2708, color: 0x06b6d4 }  // Cyan (Dubai)
 ];
 
 // Helper to draw a curved static line between two vectors
@@ -23,12 +23,12 @@ function getCurvePositions(startVec: THREE.Vector3, endVec: THREE.Vector3, segme
   const mid = startVec.clone().lerp(endVec, 0.5);
   // Bulge radius depends on how far apart they are
   const dist = startVec.distanceTo(endVec);
-  const bulge = Math.max(0.5, dist * 0.15); 
-  
+  const bulge = Math.max(0.5, dist * 0.15);
+
   mid.normalize().multiplyScalar(R + 1 + bulge);
-  
+
   const curve = new THREE.QuadraticBezierCurve3(startVec, mid, endVec);
-  
+
   for (let i = 0; i <= segments; i++) {
     points.push(curve.getPoint(i / segments));
   }
@@ -56,7 +56,7 @@ export function ValidatorNodes() {
     const nyc = nodePositions[0];
     const fra = nodePositions[1];
     const nrt = nodePositions[2];
-    const sp  = nodePositions[3];
+    const sp = nodePositions[3];
     const dxb = nodePositions[4];
     const hub = hubPos;
 
@@ -77,7 +77,7 @@ export function ValidatorNodes() {
 
   return (
     <group ref={groupRef}>
-      
+
       {/* 1. Draw the static Web Lines */}
       {lines.map((linePts, i) => (
         <group key={`line-${i}`}>
@@ -86,9 +86,7 @@ export function ValidatorNodes() {
             <bufferGeometry>
               <bufferAttribute
                 attach="attributes-position"
-                count={linePts.length}
-                array={new Float32Array(linePts.flatMap(p => [p.x, p.y, p.z]))}
-                itemSize={3}
+                args={[new Float32Array(linePts.flatMap(p => [p.x, p.y, p.z])), 3]}
               />
             </bufferGeometry>
             <lineBasicMaterial color={0x8b5cf6} transparent opacity={0.15} linewidth={1} />
@@ -102,13 +100,13 @@ export function ValidatorNodes() {
         return (
           <group key={v.id} position={[pos.x, pos.y, pos.z]}>
             <mesh>
-              <sphereGeometry args={[0.4, 8, 8]} />
+              <sphereGeometry args={[0.6, 8, 8]} />
               <meshBasicMaterial color={v.color} />
             </mesh>
             {/* Subtle glow aura */}
             <mesh>
-              <sphereGeometry args={[0.8, 8, 8]} />
-              <meshBasicMaterial color={v.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false}/>
+              <sphereGeometry args={[1, 8, 8]} />
+              <meshBasicMaterial color={v.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
           </group>
         );
