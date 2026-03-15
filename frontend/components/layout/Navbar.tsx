@@ -77,14 +77,15 @@ export function Navbar() {
       <div className="pointer-events-auto hidden font-mono lg:flex flex-col items-center gap-3">
         
         {/* Nav Links */}
-        <nav className="flex items-center glass-pill p-1">
+        <nav className="flex items-center gap-1 glass-pill p-1">
           {NAV_LINKS.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative px-5 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+                className="relative block px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors"
+                style={{ letterSpacing: "0.1em" }}
               >
                 {isActive && (
                   <motion.div
@@ -103,10 +104,11 @@ export function Navbar() {
 
         {/* Live HUD Dashboard */}
         <div className="flex items-center glass-pill px-2 py-2">
-          <div className="flex items-center gap-2 px-4 border-r border-white/10">
-            <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500 shadow-[0_0_8px_#ef4444]"}`} />
-            <span className={`text-[10px] font-bold ${isConnected ? "text-emerald-400" : "text-red-400"}`}>
-              {isConnected ? "LIVE" : "OFFLINE"}
+          {/* Live Indicator matched to stat height */}
+          <div className="flex flex-col items-center justify-center px-4 border-r border-white/10 min-w-[60px] h-full gap-1.5">
+            <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]" : "bg-red-500 shadow-[0_0_8px_#ef4444]"}`} />
+            <span className={`text-[9px] font-bold tracking-widest ${isConnected ? "text-emerald-400" : "text-red-400"}`}>
+              {isConnected ? "LIVE" : "OFF"}
             </span>
           </div>
           <HudStat label="Block" value={latestBlock ? `#${latestBlock.number.toLocaleString()}` : "—"} color="text-purple-400" />

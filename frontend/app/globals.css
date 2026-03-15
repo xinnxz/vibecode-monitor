@@ -28,8 +28,8 @@
   --color-yellow:      #eab308;
 
   /* Typography */
-  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
-  --font-mono:    var(--font-space-mono), 'Courier New', monospace;
+  --font-display: var(--font-display), system-ui, sans-serif;
+  --font-mono:    var(--font-mono), 'Courier New', monospace;
 
   /* Globe */
   --globe-radius: 1.0;
@@ -122,7 +122,23 @@ body {
 /* ——— Neon border glow ——— */
 .border-glow-purple { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 16px rgba(168, 85, 247, 0.15); }
 .border-glow-cyan   { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.4),  0 0 16px rgba(34, 211, 238, 0.15); }
-.border-glow-red    { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),   0 0 20px rgba(239, 68, 68, 0.25); }
+.border-glow-emerald{ box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.4), 0 0 16px rgba(16, 185, 129, 0.15); }
+.border-glow-red    { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),   0 0 16px rgba(239, 68, 68, 0.15); }
+
+/* ——— Sci-Fi HUD Ornaments ——— */
+.hud-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: rgba(34, 211, 238, 0.5); /* Cyan */
+  border-style: solid;
+  pointer-events: none;
+  z-index: 20;
+}
+.hud-corner.tl { top: 1rem; left: 1rem; border-width: 2px 0 0 2px; }
+.hud-corner.tr { top: 1rem; right: 1rem; border-width: 2px 2px 0 0; }
+.hud-corner.bl { bottom: 3rem; left: 1rem; border-width: 0 0 2px 2px; }
+.hud-corner.br { bottom: 3rem; right: 1rem; border-width: 0 2px 2px 0; }
 
 /* ——— Animated pulse ring (dipakai di node ping globe) ——— */
 @keyframes ring-pulse {

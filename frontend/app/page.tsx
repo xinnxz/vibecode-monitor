@@ -42,7 +42,7 @@ function StatCard({ label, value, sub, colorClass = "text-cyan-400", bgAccent = 
   return (
     <motion.div
       layout
-      className="relative glass rounded-2xl px-5 py-4 min-w-[130px] overflow-hidden group hover:bg-white/[0.02] transition-colors"
+      className="relative glass rounded-2xl px-6 py-5 min-w-[140px] overflow-hidden group hover:bg-white/[0.02] transition-colors"
     >
       {/* Decorative top thick border glow */}
       <div className={`absolute top-0 left-0 right-0 h-[2px] opacity-70 ${bgAccent} shadow-[0_0_12px_currentColor]`} />
