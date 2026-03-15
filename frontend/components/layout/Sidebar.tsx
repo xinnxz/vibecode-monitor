@@ -16,8 +16,7 @@ import { useTpsStore } from "@/hooks/useTpsStore";
 
 const HEX = "0123456789abcdef";
 const SLOT_COUNT = 8;
-const SCAN_DURATION = 100; // Hyper-fast scanning
-const LOCK_DURATION = 350; // Barely enough time to read before the next block overrides it
+const TICK_RATE = 1000; // Force a strict 1-second pulse tick to match "Active TX /s"
 
 function randomHex(len: number): string {
   let s = "0x";
@@ -117,13 +116,8 @@ function SmartCycleSlot({
         if (q.unseen.length > 0) {
           selectedBlock = q.unseen.shift()!;
         }
-        // 2. IDLE: Pick a random historical block not currently displayed
-        else if (q.history.length > 0) {
-          const available = q.history.filter(b => !q.currentlyDisplaying.has(b.number));
-          if (available.length > 0) {
-            selectedBlock = available[Math.floor(Math.random() * available.length)];
-          }
-        }
+        // 2. IDLE: We no longer play historical blocks to fake activity.
+        // It stays empty if there are no new blocks.
 
         if (selectedBlock) {
           // Track exactly how many txs are animating on screen right now!
@@ -146,14 +140,14 @@ function SmartCycleSlot({
                 q.totalProcessedHits++;
               }
             }
-            // Add random jitter (-100ms to +100ms) to lock duration to prevent overall grid syncing
+            // Enforce a strict 1-second loop
             runCycle();
-          }, LOCK_DURATION + (Math.random() * 200 - 100));
+          }, TICK_RATE);
         } else {
-          // No blocks at all, keep scanning
-          scanTimer = setTimeout(runCycle, SCAN_DURATION + (Math.random() * 50));
+          // No blocks at all, keep scanning every 1 second anyway to maintain the tick
+          scanTimer = setTimeout(runCycle, TICK_RATE);
         }
-      }, SCAN_DURATION + (Math.random() * 50));
+      }, 50); // tiny buffer before lock phase
     };
 
     const startDelay = setTimeout(runCycle, staggerDelay);
@@ -234,38 +228,38 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
       className="block group/block"
       style={{ textDecoration: "none" }}
     >
-    <div
-      className="relative pointer-events-auto transition-all duration-200 cursor-pointer group-hover/block:brightness-125"
-      style={{
-        padding: "10px 14px",
-        background: flash ? "rgba(168, 85, 247, 0.2)" : "rgba(168, 85, 247, 0.06)",
-        border: flash ? "1px solid rgba(168, 85, 247, 0.6)" : "1px solid rgba(168, 85, 247, 0.25)",
-        borderRadius: "4px",
-        overflow: "hidden",
-        transition: "all 0.5s ease-out",
-        boxShadow: flash ? "0 0 20px rgba(168,85,247,0.3), inset 0 0 15px rgba(168,85,247,0.1)" : "none",
-      }}
-    >
-      <div style={{ position: "absolute", left: 0, top: "10%", bottom: "10%", width: "2px", background: "#a855f7", boxShadow: flash ? "0 0 12px #a855f7" : "0 0 6px rgba(168,85,247,0.4)", borderRadius: "1px", transition: "box-shadow 0.5s" }} />
-      <div style={{ marginLeft: "10px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="font-display" style={{ fontSize: "11px", fontWeight: 700, color: "#c084fc", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-            {dBlock}
-          </span>
-          <span className="font-mono" style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)" }}>
-            {dTime}
-          </span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
-          <span className="font-mono" style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "190px" }}>
-            {dHash}
-          </span>
-          <span className="font-mono" style={{ fontSize: "10px", fontWeight: 700, color: "#a855f7", flexShrink: 0 }}>
-            {dTx}
-          </span>
+      <div
+        className="relative pointer-events-auto transition-all duration-200 cursor-pointer group-hover/block:brightness-125"
+        style={{
+          padding: "10px 14px",
+          background: flash ? "rgba(168, 85, 247, 0.2)" : "rgba(168, 85, 247, 0.06)",
+          border: flash ? "1px solid rgba(168, 85, 247, 0.6)" : "1px solid rgba(168, 85, 247, 0.25)",
+          borderRadius: "4px",
+          overflow: "hidden",
+          transition: "all 0.5s ease-out",
+          boxShadow: flash ? "0 0 20px rgba(168,85,247,0.3), inset 0 0 15px rgba(168,85,247,0.1)" : "none",
+        }}
+      >
+        <div style={{ position: "absolute", left: 0, top: "10%", bottom: "10%", width: "2px", background: "#a855f7", boxShadow: flash ? "0 0 12px #a855f7" : "0 0 6px rgba(168,85,247,0.4)", borderRadius: "1px", transition: "box-shadow 0.5s" }} />
+        <div style={{ marginLeft: "10px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span className="font-display" style={{ fontSize: "11px", fontWeight: 700, color: "#c084fc", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              {dBlock}
+            </span>
+            <span className="font-mono" style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)" }}>
+              {dTime}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+            <span className="font-mono" style={{ fontSize: "10px", color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "190px" }}>
+              {dHash}
+            </span>
+            <span className="font-mono" style={{ fontSize: "10px", fontWeight: 700, color: "#a855f7", flexShrink: 0 }}>
+              {dTx}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
     </a>
   );
 }
