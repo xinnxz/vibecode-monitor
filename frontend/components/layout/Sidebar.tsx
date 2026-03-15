@@ -16,8 +16,8 @@ import { useTpsStore } from "@/hooks/useTpsStore";
 
 const HEX = "0123456789abcdef";
 const SLOT_COUNT = 8;
-const SCAN_DURATION = 400;
-const LOCK_DURATION = 1000; // exactly 1 second read time
+const SCAN_DURATION = 100; // Hyper-fast scanning
+const LOCK_DURATION = 350; // Barely enough time to read before the next block overrides it
 
 function randomHex(len: number): string {
   let s = "0x";
@@ -39,6 +39,7 @@ function useDecodeText(target: string, duration = 700, active = true): string {
   const [display, setDisplay] = useState(target);
   const prev = useRef("");
   const raf = useRef<number>(0);
+  const lastUpdate = useRef<number>(0);
 
   useEffect(() => {
     if (!active || prev.current === target) return;
@@ -47,6 +48,13 @@ function useDecodeText(target: string, duration = 700, active = true): string {
     const len = target.length;
 
     const tick = (now: number) => {
+      // Throttle React state updates to ~25 FPS to save CPU
+      if (now - lastUpdate.current < 40) {
+        raf.current = requestAnimationFrame(tick);
+        return;
+      }
+      lastUpdate.current = now;
+
       const p = Math.min((now - start) / duration, 1);
       const locked = Math.floor(p * len);
       let r = "";
@@ -70,6 +78,7 @@ type QueueManager = {
   unseen: ProcessedBlock[];
   history: ProcessedBlock[];
   currentlyDisplaying: Map<number, number>; // block.number -> txCount
+  totalProcessedHits: number;
 };
 
 // ——— Single Slot Component ———
@@ -133,15 +142,18 @@ function SmartCycleSlot({
                 // Keep history capped at 100 blocks
                 if (q.history.length > 100) q.history.shift();
                 q.history.push(selectedBlock!);
+                // Increment our forever counter for the UI stat
+                q.totalProcessedHits++;
               }
             }
+            // Add random jitter (-100ms to +100ms) to lock duration to prevent overall grid syncing
             runCycle();
-          }, LOCK_DURATION);
+          }, LOCK_DURATION + (Math.random() * 200 - 100));
         } else {
           // No blocks at all, keep scanning
-          scanTimer = setTimeout(runCycle, SCAN_DURATION);
+          scanTimer = setTimeout(runCycle, SCAN_DURATION + (Math.random() * 50));
         }
-      }, SCAN_DURATION);
+      }, SCAN_DURATION + (Math.random() * 50));
     };
 
     const startDelay = setTimeout(runCycle, staggerDelay);
@@ -208,10 +220,10 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
   const tx = `${block.txCount} TX`;
   const time = new Date(block.timestamp * 1000).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 
-  const dBlock = useDecodeText(blockLabel, 300, true);
-  const dHash = useDecodeText(hash, 500, true);
-  const dTx = useDecodeText(tx, 150, true);
-  const dTime = useDecodeText(time, 250, true);
+  const dBlock = useDecodeText(blockLabel, 200, true);
+  const dHash = useDecodeText(hash, 300, true);
+  const dTx = useDecodeText(tx, 100, true);
+  const dTime = useDecodeText(time, 150, true);
 
 
   return (
@@ -251,13 +263,14 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
 }
 
 export function Sidebar() {
-  const { recentBlocks } = useBlockStream();
+  const { recentBlocks, tps: trueNetworkTps } = useBlockStream();
 
   // Shared state manager for all slots
   const queueManager = useRef<QueueManager>({
     unseen: [],
     history: [],
     currentlyDisplaying: new Map(),
+    totalProcessedHits: 0,
   });
 
   // Share the currently displayed TPS visually backwards
@@ -265,20 +278,14 @@ export function Sidebar() {
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
-      let totalVisibleTx = 0;
-      queueManager.current.currentlyDisplaying.forEach((txCount) => {
-        totalVisibleTx += txCount;
-      });
-
-      // Calculate visual TPS. 
-      // All blocks currently on screen take 1 second to animate the locked phase.
-      const visualTps = Math.round(totalVisibleTx / (LOCK_DURATION / 1000));
+      // Use the true network TPS instead of multiplying visual card data
+      const visualTps = trueNetworkTps;
 
       if (visualTps !== lastEmitted) {
         useTpsStore.getState().setVisualTps(visualTps);
         lastEmitted = visualTps;
       }
-    }, 400); // Poll 2.5 times a second
+    }, 1000); // Update stat card once per second so it's readable, not flickering
     return () => clearInterval(interval);
   }, []);
 
@@ -301,11 +308,16 @@ export function Sidebar() {
         q.unseen.unshift(b);
       }
     });
+
+    // Prevent traffic jam backlog! If the queue gets too huge, drop the oldest ones.
+    if (q.unseen.length > 20) {
+      q.unseen.length = 20;
+    }
   }, [recentBlocks]);
 
   const totalScanned = recentBlocks.length;
   // Calculate hits from our history + currently unseen
-  const totalHits = queueManager.current.history.length + queueManager.current.unseen.length + queueManager.current.currentlyDisplaying.size;
+  const totalHits = queueManager.current.totalProcessedHits + queueManager.current.currentlyDisplaying.size;
 
   // Pre-calculate randomized stagger delays so they pop up organically, not top-to-bottom
   const staggerDelays = useMemo(() => {

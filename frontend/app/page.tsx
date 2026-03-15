@@ -14,10 +14,12 @@ import { useState, useEffect, useRef } from "react";
 import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
 
+import { ReactNode } from "react";
+
 // ——— Premium HUD Stat Card (Corner Bracket Style with Standby Telemetry) ———
 function StatCard({ label, value, sub, colorClass = "text-cyan-400", borderColor = "#22d3ee" }: {
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   sub?: string;
   colorClass?: string;
   borderColor?: string;
@@ -218,7 +220,11 @@ export default function DashboardPage() {
           />
           <StatCard
             label="Active TX"
-            value={visualTps > 0 ? visualTps : "—"}
+            value={
+              visualTps > 0 
+                ? <span className="flex items-baseline gap-1">{visualTps}<span className="text-sm opacity-50">/s</span></span> 
+                : "—"
+            }
             sub="Transactions"
             colorClass="text-indigo-400"
             borderColor="#818cf8"

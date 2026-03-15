@@ -34,7 +34,7 @@ function SciFiNavLink({ item, isActive }: { item: { href: string; label: string 
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     const target = item.label;
-    const duration = 250; 
+    const duration = 250;
     const start = performance.now();
 
     const tick = (now: number) => {
@@ -94,13 +94,12 @@ function SciFiNavLink({ item, isActive }: { item: { href: string; label: string 
       />
 
       <span
-        className={`font-mono text-[13px] tracking-widest uppercase transition-colors duration-300 ${
-          isActive 
-            ? "text-white font-bold drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" 
-            : isHovered
+        className={`font-mono text-[13px] tracking-widest uppercase transition-colors duration-300 ${isActive
+          ? "text-white font-bold drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+          : isHovered
             ? "text-purple-300"
             : "text-white/40"
-        }`}
+          }`}
       >
         {displayText}
       </span>
@@ -122,12 +121,12 @@ export function Navbar() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "28px 48px",
+        padding: "28px 40px", // Aligned perfectly with Sidebar's 40px right margin
         pointerEvents: "none",
       }}
     >
       {/* ——— LEFT: Logo ——— */}
-      <div style={{ pointerEvents: "auto", marginLeft: "16px", marginTop: "4px" }}>
+      <div style={{ pointerEvents: "auto", marginTop: "4px" }}>
         <Link href="/" className="block">
           <Image
             src="/somnia-logo.png"
@@ -146,8 +145,7 @@ export function Navbar() {
           pointerEvents: "auto",
           display: "flex",
           alignItems: "center",
-          gap: "40px", // slightly tighter gap to fit brackets
-          marginRight: "16px",
+          gap: "40px", 
         }}
       >
         {/* Nav Links */}
@@ -157,11 +155,15 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Wallet Pill — separated by a subtle divider */}
+        {/* Divider placed exactly in the center of the gap */}
+        <div style={{ height: "30px", width: "1px", backgroundColor: "rgba(255,255,255,0.1)" }} />
+
+        {/* Wallet Pill Container */}
         <div
           style={{
-            paddingLeft: "24px",
-            borderLeft: "1px solid rgba(255,255,255,0.1)",
+            width: "220px", // Fixed container to isolate button jitter
+            display: "flex",
+            justifyContent: "flex-end", // Button expands outwards to the left instead of shifting the layout
           }}
         >
           <WalletButton />
