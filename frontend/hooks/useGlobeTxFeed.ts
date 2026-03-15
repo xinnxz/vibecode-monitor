@@ -145,16 +145,8 @@ export function useGlobeTxFeed() {
     // Immediately show pings
     setPings(prev => [...prev, ...newPings].slice(-100));
 
-    // === PHASE 2: MEMPOOL GOSSIP PROTOCOL T=0ms ===
-    if (!isBurst) {
-      const newGossip: ActiveNodePulse[] = hashesData.map(data => ({
-        id: `gossip-${data.id}`,
-        lat: data.from.lat,
-        lng: data.from.lng,
-        color: "#4ade80",
-      }));
-      setNodePulses(prev => [...prev, ...newGossip].slice(-50));
-    }
+    // === PHASE 2: MEMPOOL GOSSIP PROTOCOL (REMOVED) ===
+    // (User preferred a cleaner look without constant green rings)
 
     // === PHASE 3 & 4: VALIDATION ARC T=150ms ===
     const t2 = setTimeout(() => {

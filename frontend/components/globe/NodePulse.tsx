@@ -40,6 +40,10 @@ export function NodePulse({ lat, lng, color = "#4ade80", onDone }: NodePulseProp
     }
 
     if (meshRef.current && matRef.current) {
+      // Keep the ring flush against the curved surface of the earth
+      // even as the parent container rotates!
+      meshRef.current.lookAt(0, 0, 0);
+      
       // Scale expands outward (like a radar ping)
       const s = 1 + progress.current * 4.0;
       meshRef.current.scale.set(s, s, s);
@@ -57,10 +61,6 @@ export function NodePulse({ lat, lng, color = "#4ade80", onDone }: NodePulseProp
     <mesh
       ref={meshRef}
       position={[pos.x, pos.y, pos.z]}
-      onUpdate={(self) => {
-        // Orient the pulse flat against the globe
-        self.lookAt(0, 0, 0);
-      }}
     >
       <ringGeometry args={[0.8, 1.0, 24]} />
       <meshBasicMaterial

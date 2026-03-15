@@ -30,20 +30,17 @@ export function NodePing({ lat, lng, color = "#22d3ee", size = 1, onDone }: Node
 
   const pos = useMemo(() => latLngToXYZ(lat, lng, R + 0.5), [lat, lng]);
 
-  // Look direction: from globe center outward (for billboard-style rotation)
-  const lookQuat = useMemo(() => {
-    const dir = new THREE.Vector3(pos.x, pos.y, pos.z).normalize();
-    const m = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(0, 0, 0),
-      dir,
-      new THREE.Vector3(0, 1, 0)
-    );
-    return new THREE.Quaternion().setFromRotationMatrix(m);
-  }, [pos]);
+  const groupRef = useRef<THREE.Group>(null!);
 
   useFrame((_, delta) => {
     age.current += delta;
     const t = age.current / LIFETIME;
+
+    if (groupRef.current) {
+      // Keep the ping oriented correctly against the curved surface
+      // as the container spins.
+      groupRef.current.lookAt(0, 0, 0);
+    }
 
     // Core: pop in fast, then fade
     if (coreRef.current) {
@@ -73,7 +70,7 @@ export function NodePing({ lat, lng, color = "#22d3ee", size = 1, onDone }: Node
   });
 
   return (
-    <group position={[pos.x, pos.y, pos.z]} quaternion={lookQuat}>
+    <group ref={groupRef} position={[pos.x, pos.y, pos.z]}>
       {/* Core glow dot */}
       <mesh ref={coreRef}>
         <sphereGeometry args={[0.8, 8, 8]} />

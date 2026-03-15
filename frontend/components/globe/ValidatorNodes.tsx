@@ -100,12 +100,12 @@ export function ValidatorNodes() {
         return (
           <group key={v.id} position={[pos.x, pos.y, pos.z]}>
             <mesh>
-              <sphereGeometry args={[0.6, 8, 8]} />
+              <sphereGeometry args={[0.6, 24, 24]} />
               <meshBasicMaterial color={v.color} />
             </mesh>
             {/* Subtle glow aura */}
             <mesh>
-              <sphereGeometry args={[1, 8, 8]} />
+              <sphereGeometry args={[1, 24, 24]} />
               <meshBasicMaterial color={v.color} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
           </group>

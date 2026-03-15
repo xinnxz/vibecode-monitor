@@ -301,20 +301,15 @@ export function Sidebar() {
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
-      // Smooth decay algorithm: Lose 3% of the accumulator per tick to create a gliding stop
-      globalAccumulator = globalAccumulator * 0.95;
-      
-      // If it falls below 0.1, snap to 0 to stop micro-decimals
-      if (globalAccumulator < 0.1) globalAccumulator = 0;
-
-      // Calculate absolute real-time visible transactions with the accumulator
-      const visualTps = Math.ceil(globalAccumulator);
+      // User requested that the Active TX count does not reset/decay,
+      // it should accumulate exactly like the Total TX counter.
+      const visualTps = globalAccumulator;
 
       if (visualTps !== lastEmitted) {
         useTpsStore.getState().setVisualTps(visualTps);
         lastEmitted = visualTps;
       }
-    }, 100); // Fast 100ms poll for smooth numerical countdown
+    }, 100); // 100ms UI sync
     return () => clearInterval(interval);
   }, []);
 
