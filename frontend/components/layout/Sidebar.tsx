@@ -12,6 +12,7 @@
 
 import { useBlockStream, ProcessedBlock } from "@/hooks/useBlockStream";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useTpsStore } from "@/hooks/useTpsStore";
 
 const HEX = "0123456789abcdef";
 const SLOT_COUNT = 8;
@@ -249,7 +250,7 @@ function LockedView({ block, flash }: { block: ProcessedBlock; flash: boolean })
   );
 }
 
-export function Sidebar({ onVisualTpsUpdate }: { onVisualTpsUpdate?: (tps: number) => void }) {
+export function Sidebar() {
   const { recentBlocks } = useBlockStream();
 
   // Shared state manager for all slots
@@ -261,7 +262,6 @@ export function Sidebar({ onVisualTpsUpdate }: { onVisualTpsUpdate?: (tps: numbe
 
   // Share the currently displayed TPS visually backwards
   useEffect(() => {
-    if (!onVisualTpsUpdate) return;
     let lastEmitted = -1;
 
     const interval = setInterval(() => {
@@ -271,17 +271,16 @@ export function Sidebar({ onVisualTpsUpdate }: { onVisualTpsUpdate?: (tps: numbe
       });
 
       // Calculate visual TPS. 
-      // All blocks currently on screen take 2 seconds to animate the locked phase.
-      // E.g. 8 blocks with 10 tx each = 80 total tx -> 40 TPS visual.
+      // All blocks currently on screen take 1 second to animate the locked phase.
       const visualTps = Math.round(totalVisibleTx / (LOCK_DURATION / 1000));
 
       if (visualTps !== lastEmitted) {
-        onVisualTpsUpdate(visualTps);
+        useTpsStore.getState().setVisualTps(visualTps);
         lastEmitted = visualTps;
       }
     }, 400); // Poll 2.5 times a second
     return () => clearInterval(interval);
-  }, [onVisualTpsUpdate]);
+  }, []);
 
   // Watch for new blocks from the stream and add active ones to `unseen` queue
   useEffect(() => {

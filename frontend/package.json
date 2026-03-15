@@ -21,7 +21,8 @@
     "recharts": "^3.8.0",
     "three": "^0.183.2",
     "viem": "^2.47.4",
-    "wagmi": "^3.5.0"
+    "wagmi": "^3.5.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

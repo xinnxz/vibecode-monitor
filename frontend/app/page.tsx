@@ -9,9 +9,9 @@
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { useBlockStream } from "@/hooks/useBlockStream";
 import { useWhaleAlerts } from "@/hooks/useWhaleAlerts";
 import { useNetworkStats } from "@/hooks/useNetworkStats";
+import { useTpsStore } from "@/hooks/useTpsStore";
 import { useState, useEffect, useRef } from "react";
 import { formatCompact, shortAddress } from "@/lib/utils/geo";
 import { motion } from "framer-motion";
@@ -181,7 +181,7 @@ export default function DashboardPage() {
   const { tps } = useBlockStream();
   const { stats } = useNetworkStats();
   const { alerts: whaleAlerts } = useWhaleAlerts();
-  const [visualTps, setVisualTps] = useState(0);
+  const visualTps = useTpsStore((state) => state.visualTps);
 
   return (
     <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
@@ -208,9 +208,6 @@ export default function DashboardPage() {
           </span>
         </div>
       </div>
-
-      {/* ——— Navbar ——— */}
-      <Navbar />
 
       {/* ——— Main Environment Overlay (Full Screen) ——— */}
       <main className="absolute inset-0 z-0">
@@ -255,11 +252,6 @@ export default function DashboardPage() {
             colorClass="text-red-400"
             borderColor="#ef4444"
           />
-        </div>
-
-        {/* ——— Sidebar (Floating Panel Right) ——— */}
-        <div className="pointer-events-auto">
-          <Sidebar onVisualTpsUpdate={setVisualTps} />
         </div>
 
         {/* ——— Whale Ticker (Bottom Edge) ——— */}

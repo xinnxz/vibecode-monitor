@@ -32,6 +32,14 @@ const GlobeScene = dynamic(
   }
 );
 
+// Dynamic import for Sidebar to avoid SSR polling issues
+const Sidebar = dynamic(
+  () => import("@/components/layout/Sidebar").then((m) => ({ default: m.Sidebar })),
+  { ssr: false }
+);
+
+import { Navbar } from "@/components/layout/Navbar";
+
 export const metadata: Metadata = {
   title: 'SomniaScan | Pulse',
   description: 'Mission Control interface for Somnia Testnet.',
@@ -53,6 +61,12 @@ export default function RootLayout({
             </div>
             {/* Cinematic Vignette Overlay */}
             <div className="absolute inset-0 vignette pointer-events-none z-0" />
+          </div>
+
+          {/* ——— Persistent Global UI (Navbar & Sidebar) ——— */}
+          <Navbar />
+          <div className="pointer-events-auto">
+            <Sidebar />
           </div>
 
           {/* ——— Page Content Layer ——— */}
