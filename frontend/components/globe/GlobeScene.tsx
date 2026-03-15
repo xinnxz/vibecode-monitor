@@ -120,7 +120,7 @@ export function GlobeScene() {
         dampingFactor={0.05}
         enablePan
         autoRotate
-        autoRotateSpeed={0.5}
+        autoRotateSpeed={0.2}
         minDistance={80}
         maxDistance={350}
       />

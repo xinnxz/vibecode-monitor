@@ -14,6 +14,7 @@
 import { useRef, useMemo, useEffect } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { earthRotationRef } from "./SomniaHub";
 
 const R = 50; // Radius bumi — sama dengan referensi
 
@@ -151,13 +152,15 @@ export function EarthGlobe() {
 
     // Rotasi bumi
     if (earthRef.current) {
-      earthRef.current.rotation.y += delta * 0.1;
+      earthRef.current.rotation.y += delta * 0.04;
+      earthRotationRef.y = earthRef.current.rotation.y; // Share rotation with SomniaHub
     }
   });
 
   // Ring colors representing Somnia Theme
-  const ringColors = [0x4b0082, 0x2e0094, 0x4b0082];
-  const ballColors = [0x9d00ff, 0x9d00ff, 0xffffff];
+  // Only ring 3 (outermost, scale 0.8x) kept — rings 1 & 2 removed
+  const outerRingColor = 0x4b0082;
+  const outerBallColor = 0xffffff;
 
   return (
     <group ref={earthRef}>
@@ -211,30 +214,18 @@ export function EarthGlobe() {
         />
       </sprite>
 
-      {/* ——— 5. Satellite orbit ring 1 ——— */}
-      <mesh geometry={orbitGeo}>
-        <meshBasicMaterial color={ringColors[0]} transparent opacity={0.4} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* ——— 6. Satellite orbit ring 2 (scaled + rotated) ——— */}
-      <mesh geometry={orbitGeo} scale={[1.2, 1.2, 1.2]} rotation={[0, 0, Math.PI / 6]}>
-        <meshBasicMaterial color={ringColors[1]} transparent opacity={0.4} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* ——— 7. Satellite orbit ring 3 ——— */}
+      {/* ——— 5. Outermost satellite ring only (rings 1+2 removed) ——— */}
       <mesh geometry={orbitGeo} scale={[0.8, 0.8, 0.8]} rotation={[0, 0, -Math.PI / 6]}>
-        <meshBasicMaterial color={ringColors[2]} transparent opacity={0.4} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={outerRingColor} transparent opacity={0.35} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* ——— 8. Satellite balls ——— */}
-      {satPositions.map((ring, ringIdx) =>
-        ring.map((pos, i) => (
-          <mesh key={`sat-${ringIdx}-${i}`} position={[pos.x, pos.y, pos.z]}>
-            <sphereGeometry args={[1, 16, 16]} />
-            <meshBasicMaterial color={ballColors[ringIdx]} />
-          </mesh>
-        ))
-      )}
+      {/* ——— 6. Satellite ball on outermost ring ——— */}
+      {satPositions[2]?.map((pos, i) => (
+        <mesh key={`sat-outer-${i}`} position={[pos.x * 0.8, pos.y * 0.8, pos.z * 0.8]}>
+          <sphereGeometry args={[1, 16, 16]} />
+          <meshBasicMaterial color={outerBallColor} />
+        </mesh>
+      ))}
     </group>
   );
 }
