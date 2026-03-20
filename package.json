@@ -1,0 +1,19 @@
+{
+  "name": "antigravity-monitor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "gsap": "^3.14.2",
+    "three": "^0.183.2"
+  }
+}
