@@ -1,15 +1,14 @@
 /**
- * ui.js — UI Module
+ * ui.js — UI Module (Simplified)
  * 
  * Mengatur semua interaksi DOM:
- * 1. Render daftar akun ke panel sidebar
+ * 1. Render daftar akun ke grid dashboard
  * 2. Render stats bar (total/available/limited)
  * 3. Handle modal form (add/edit akun)
  * 4. Handle confirm dialog (delete akun)
  * 5. Filter akun (All / Active / Limited)
  * 6. Live countdown timer (update via requestAnimationFrame)
  * 7. Notifikasi saat akun ready
- * 8. Drag-to-reorder cards
  */
 
 import {
@@ -72,8 +71,6 @@ let isSelectMode = false;
 const selectedAccounts = new Set();
 
 let onDataChange = null;
-let focusGlobeCb = null;
-let activeGlobeAccountId = null;
 
 // ID akun yang sedang pending delete (untuk confirm dialog)
 let pendingDeleteId = null;
@@ -106,12 +103,10 @@ let lastCountdownUpdate = 0;
 /**
  * Inisialisasi UI.
  * 
- * @param {Function} updateGlobeVisuals - Callback yang dipanggil saat data berubah
- * @param {Function} focusCb - Callback untuk mengarahkan kamera globe ke akun tertentu
+ * @param {Function} onDataChangeCb - Callback yang dipanggil saat data berubah
  */
-export async function initUI(updateGlobeVisuals, focusCb) {
-  onDataChange = updateGlobeVisuals;
-  if (focusCb) focusGlobeCb = focusCb;
+export async function initUI(onDataChangeCb) {
+  onDataChange = onDataChangeCb || null;
 
   // Ambil referensi ke DOM elements
   accountListEl = document.getElementById('account-list');
@@ -163,20 +158,7 @@ export async function initUI(updateGlobeVisuals, focusCb) {
     });
   }
 
-  // Fix scroll: Isolasi scroll panel dari Three.js OrbitControls.
-  // OrbitControls memasang listener di renderer.domElement;
-  // kita stop propagation agar interaksi di panel tidak bocor ke canvas.
-  const sidePanel = document.getElementById('side-panel');
-  sidePanel.addEventListener('wheel', (e) => {
-    e.stopPropagation();
-  }, { passive: true });
-
-  // Block pointer dan touch events agar globe tidak mengira user sedang drag
-  ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend'].forEach(evt => {
-    sidePanel.addEventListener(evt, (e) => {
-      e.stopPropagation();
-    }, { passive: true });
-  });
+  // No scroll isolation needed anymore (globe removed)
 
   // --- Event Listeners ---
 
@@ -466,7 +448,7 @@ function renderAccountList(accounts) {
           : '';
 
         return `
-    <div class="account-card status-${account.status} ${selectedAccounts.has(account.id) ? 'selected' : ''} ${activeGlobeAccountId === account.id ? 'active-focus' : ''}" 
+    <div class="account-card status-${account.status} ${selectedAccounts.has(account.id) ? 'selected' : ''}" 
          style="animation-delay: ${index * 0.08}s" 
          data-account-id="${account.id}">
       <!-- Checkbox for Select Mode -->
@@ -842,14 +824,12 @@ function updateCountdowns() {
 // ============================================================
 
 /**
- * Handle klik pada tombol di dalam card akun, DAN klik pada card itu sendiri untuk fitur Globe Focus.
+ * Handle klik pada tombol di dalam card akun.
  */
 function handleCardAction(e) {
   const btn = e.target.closest('[data-action]');
-  const card = e.target.closest('.account-card');
   
   if (btn) {
-    // Tombol aksi diklik
     const action = btn.dataset.action;
     const id = btn.dataset.id;
 
@@ -862,27 +842,6 @@ function handleCardAction(e) {
     } else if (action === 'copy') {
       const name = btn.dataset.name;
       copyToClipboard(name, btn);
-    }
-  } else if (card) {
-    // Card itu sendiri diklik (bukan sebuah tombol spesifik)
-    // Jangan zoom kalau sedang mode Select All (bulk action)
-    if (!isSelectMode && focusGlobeCb) {
-       const accountId = card.dataset.accountId;
-
-       if (activeGlobeAccountId === accountId) {
-         // Toggle Off: kembalikan kamera ke posisi semula
-         activeGlobeAccountId = null;
-         document.querySelectorAll('.account-card.active-focus').forEach(c => c.classList.remove('active-focus'));
-         focusGlobeCb(null, true); // true = reset camera
-         playClick();
-       } else {
-         // Toggle On: fokuskan kamera ke akun ini
-         activeGlobeAccountId = accountId;
-         document.querySelectorAll('.account-card.active-focus').forEach(c => c.classList.remove('active-focus'));
-         card.classList.add('active-focus');
-         focusGlobeCb(accountId, false); // <--- Sekarang pass accountId
-         playClick();
-       }
     }
   }
 }

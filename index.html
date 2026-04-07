@@ -4,205 +4,172 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vibe Code Monitor — Account Limit Tracker</title>
-    <meta name="description" content="Three.js globe dashboard to monitor vibe coding account limits and quota status in real-time." />
+    <meta name="description" content="Clean dashboard to monitor vibe coding account limits and quota status in real-time." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
   </head>
   <body>
-    <!-- CRT Scanline Overlay -->
-    <div id="crt-overlay"></div>
 
-    <!-- Boot Sequence Screen -->
-    <div id="boot-screen" class="boot-waiting">
-      <div class="boot-prompt">[ click anywhere to initialize ]</div>
-      <div class="boot-terminal">
-        <div class="boot-line" style="--delay:0">Vibe Code Monitor v2.0</div>
-        <div class="boot-line" style="--delay:1">================================</div>
-        <div class="boot-line" style="--delay:2">> initializing system<span class="boot-dots">...</span></div>
-        <div class="boot-line" style="--delay:3">> connecting to database<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
-        <div class="boot-line" style="--delay:4">> loading account data<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
-        <div class="boot-line" style="--delay:5">> rendering globe<span class="boot-dots">...</span> <span class="boot-ok">[OK]</span></div>
-        <div class="boot-line" style="--delay:6">> system ready. welcome, operator.<span class="boot-cursor">█</span></div>
-      </div>
-    </div>
+    <!-- Main App Container -->
+    <div id="app-container">
 
-    <!-- Three.js Canvas Container -->
-    <div id="canvas-container"></div>
-
-    <!-- Atmospheric ASCII Dashboard (fills left empty space) -->
-    <div id="ascii-dashboard">
-      <div class="ascii-block">
-<pre>
-sys.mon // v2.0
-[========  ] 80%
-MEM: 0x8F3A2B
-NET: UPLINK_SECURE
-</pre>
-      </div>
-      <div class="ascii-block glitch-text" data-text="MONITORING ACTIVE">
-        MONITORING ACTIVE
-      </div>
-      <div class="ascii-block">
-        <span class="ascii-blink">_</span>
-      </div>
-    </div>
-
-    <!-- Header -->
-    <header id="header">
-      <div class="header-left">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10" />
-            <ellipse cx="12" cy="12" rx="10" ry="4" />
-            <ellipse cx="12" cy="12" rx="4" ry="10" />
-            <line x1="2" y1="12" x2="22" y2="12" />
-          </svg>
-        </div>
-        <div>
-          <h1>Vibe Code Monitor</h1>
-          <p class="subtitle">Account Limit Tracker</p>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="stats-bar" id="stats-bar">
-          <!-- Stats will be injected by JS -->
-        </div>
-      </div>
-    </header>
-
-    <!-- Side Panel -->
-    <aside id="side-panel" class="panel">
-      <!-- Matrix Rain Canvas (background) -->
-      <canvas id="matrix-canvas"></canvas>
-      <div class="panel-header">
-        <h2>Accounts</h2>
-        <div class="panel-header-actions">
-          <button id="btn-notifications" class="btn-icon notif-bell" title="Notifications">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      <!-- Header -->
+      <header id="header">
+        <div class="header-left">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
-            <span id="notif-badge" class="notif-badge hidden">0</span>
-          </button>
-          <button id="btn-add-account" class="btn-primary" title="Add Account">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Add
-          </button>
+          </div>
+          <div>
+            <h1>Vibe Code Monitor</h1>
+            <p class="subtitle">Account Limit Tracker</p>
+          </div>
         </div>
-      </div>
-      <!-- Notification Dropdown -->
-      <div id="notif-panel" class="notif-panel hidden">
-        <div class="notif-panel-header">
-          <span>// notifications</span>
-          <button id="btn-clear-notifs" class="btn-icon" title="Clear All">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+        <div class="header-right">
+          <div class="stats-bar" id="stats-bar">
+            <!-- Stats will be injected by JS -->
+          </div>
         </div>
-        <div id="notif-list" class="notif-list">
-          <p class="notif-empty">// no notifications</p>
+      </header>
+
+      <!-- Main Content Area -->
+      <main id="main-content">
+
+        <!-- Toolbar -->
+        <div class="main-toolbar">
+          <div class="toolbar-left">
+            <div class="panel-filters">
+              <button class="filter-btn active" data-filter="all">ALL</button>
+              <button class="filter-btn" data-filter="available">ACTIVE</button>
+              <button class="filter-btn" data-filter="limited">LIMITED</button>
+            </div>
+            <div class="search-box">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input type="text" id="search-input" placeholder="search accounts..." autocomplete="off" />
+            </div>
+            <select id="sort-select" class="sort-select" title="Sort accounts">
+              <option value="default">↕ Default</option>
+              <option value="name-asc">A → Z</option>
+              <option value="name-desc">Z → A</option>
+              <option value="time-asc">⏱ Soonest</option>
+              <option value="status">● Active first</option>
+            </select>
+            <select id="filter-provider" class="sort-select" title="Filter by Provider">
+              <option value="all">All Providers</option>
+              <!-- Populated dynamically from providers.js -->
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <button id="btn-sound-toggle" class="btn-icon sound-toggle" title="Toggle Sound">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+            </button>
+            <button id="btn-music-toggle" class="btn-icon music-toggle" title="Toggle Ambient Music">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button id="btn-export" class="btn-icon" title="Export JSON Backup">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+            <label for="input-import" class="btn-icon" title="Import JSON Backup" style="cursor:pointer;margin-bottom:0;display:flex;align-items:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </label>
+            <input type="file" id="input-import" accept=".json" style="display:none;" />
+            <div class="toolbar-divider"></div>
+            <button id="btn-select-mode" class="btn-icon" title="Toggle Select Mode">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="9 11 12 14 22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </button>
+            <button id="btn-notifications" class="btn-icon notif-bell" title="Notifications">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span id="notif-badge" class="notif-badge hidden">0</span>
+            </button>
+            <button id="btn-settings-open" class="btn-icon" title="Notification Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button id="btn-add-account" class="btn-primary" title="Add Account">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Account
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="panel-filters">
-        <button class="filter-btn active" data-filter="all">ALL</button>
-        <button class="filter-btn" data-filter="available">ACTIVE</button>
-        <button class="filter-btn" data-filter="limited">LIMITED</button>
-      </div>
-      <!-- Search + Sort Bar -->
-      <div class="panel-toolbar">
-        <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input type="text" id="search-input" placeholder="search accounts..." autocomplete="off" />
+
+        <!-- Notification Dropdown -->
+        <div id="notif-panel" class="notif-panel hidden">
+          <div class="notif-panel-header">
+            <span>// notifications</span>
+            <button id="btn-clear-notifs" class="btn-icon" title="Clear All">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+          <div id="notif-list" class="notif-list">
+            <p class="notif-empty">// no notifications</p>
+          </div>
         </div>
-        <select id="sort-select" class="sort-select" title="Sort accounts">
-          <option value="default">↕ Default</option>
-          <option value="name-asc">A → Z</option>
-          <option value="name-desc">Z → A</option>
-          <option value="time-asc">⏱ Soonest</option>
-          <option value="status">● Active first</option>
-        </select>
-        <select id="filter-provider" class="sort-select" title="Filter by Provider">
-          <option value="all">All Providers</option>
-          <!-- Populated dynamically from providers.js -->
-        </select>
-      </div>
-      
-      <!-- Action Buttons Bar -->
-      <div class="panel-actions">
-        <button id="btn-sound-toggle" class="btn-icon sound-toggle" title="Toggle Sound">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-          </svg>
-        </button>
-        <button id="btn-music-toggle" class="btn-icon music-toggle" title="Toggle Ambient Music">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
-          </svg>
-        </button>
-        <div class="toolbar-divider" style="width:1px;height:16px;background:rgba(255,255,255,0.1);margin:0 4px;"></div>
-        <button id="btn-export" class="btn-icon" title="Export JSON Backup">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
-        <label for="input-import" class="btn-icon" title="Import JSON Backup" style="cursor:pointer;margin-bottom:0;display:flex;align-items:center;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-        </label>
-        <input type="file" id="input-import" accept=".json" style="display:none;" />
-        <div class="toolbar-divider" style="width:1px;height:16px;background:rgba(255,255,255,0.1);margin:0 4px;"></div>
-        <button id="btn-select-mode" class="btn-icon" title="Toggle Select Mode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <polyline points="9 11 12 14 22 4" />
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-          </svg>
-        </button>
-        <button id="btn-settings-open" class="btn-icon" title="Notification Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-      </div>
-      <div class="panel-body" id="account-list">
-        <!-- Account cards will be injected by JS -->
-      </div>
-      <!-- Floating Bulk Action Bar -->
-      <div id="bulk-action-bar" class="bulk-action-bar hidden">
-        <div class="bulk-action-left">
-          <input type="checkbox" id="chk-select-all" class="hacker-checkbox" />
-          <span id="bulk-count">0 selected</span>
+
+        <!-- Account Cards Grid -->
+        <div class="panel-body" id="account-list">
+          <!-- Account cards will be injected by JS -->
         </div>
-        <div class="bulk-action-right">
-          <button id="btn-bulk-available" class="btn-bulk btn-bulk-green" title="Set Available">●</button>
-          <button id="btn-bulk-limited" class="btn-bulk btn-bulk-red" title="Set Limited">✕</button>
-          <button id="btn-bulk-delete" class="btn-bulk btn-bulk-outline" title="Delete Selected">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+
+        <!-- Floating Bulk Action Bar -->
+        <div id="bulk-action-bar" class="bulk-action-bar hidden">
+          <div class="bulk-action-left">
+            <input type="checkbox" id="chk-select-all" class="hacker-checkbox" />
+            <span id="bulk-count">0 selected</span>
+          </div>
+          <div class="bulk-action-right">
+            <button id="btn-bulk-available" class="btn-bulk btn-bulk-green" title="Set Available">●</button>
+            <button id="btn-bulk-limited" class="btn-bulk btn-bulk-red" title="Set Limited">✕</button>
+            <button id="btn-bulk-delete" class="btn-bulk btn-bulk-outline" title="Delete Selected">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
         </div>
-      </div>
-      <!-- Activity Log Console -->
+      </main>
+
+      <!-- Activity Log (bottom bar) -->
       <div id="activity-log" class="activity-log collapsed">
         <button id="btn-toggle-log" class="log-toggle-btn">
           <span class="log-toggle-icon">▸</span>
@@ -211,7 +178,7 @@ NET: UPLINK_SECURE
         </button>
         <div id="log-list" class="log-list"></div>
       </div>
-    </aside>
+    </div>
 
     <!-- Modal -->
     <div id="modal-overlay" class="modal-overlay hidden">
@@ -270,8 +237,8 @@ NET: UPLINK_SECURE
             </div>
             <input type="hidden" id="input-id" />
             <div class="form-actions">
-              <button type="button" id="btn-cancel" class="btn-secondary">Abort</button>
-              <button type="submit" class="btn-primary">Execute</button>
+              <button type="button" id="btn-cancel" class="btn-secondary">Cancel</button>
+              <button type="submit" class="btn-primary">Save</button>
             </div>
           </form>
         </div>
@@ -285,10 +252,10 @@ NET: UPLINK_SECURE
           <h3>// confirm_delete</h3>
         </div>
         <div class="modal-body">
-          <p id="confirm-message" class="confirm-text">terminate account process?</p>
+          <p id="confirm-message" class="confirm-text">Delete this account?</p>
           <div class="form-actions">
-            <button id="btn-confirm-cancel" class="btn-secondary">Abort</button>
-            <button id="btn-confirm-delete" class="btn-danger">Confirm</button>
+            <button id="btn-confirm-cancel" class="btn-secondary">Cancel</button>
+            <button id="btn-confirm-delete" class="btn-danger">Delete</button>
           </div>
         </div>
       </div>
@@ -343,14 +310,13 @@ NET: UPLINK_SECURE
             </div>
             
             <div class="form-actions" style="margin-top: 24px;">
-              <button type="button" id="btn-settings-cancel" class="btn-secondary">Abort</button>
+              <button type="button" id="btn-settings-cancel" class="btn-secondary">Cancel</button>
               <button type="submit" class="btn-primary">Save Config</button>
             </div>
           </form>
         </div>
       </div>
     </div>
-
 
     <!-- Command Palette (Ctrl+K) -->
     <div id="cmd-overlay" class="cmd-overlay hidden">
